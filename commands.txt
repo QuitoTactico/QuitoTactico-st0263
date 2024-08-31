@@ -1,0 +1,4 @@
+pip install -r requirements.txt
+
+Si quieres compilar el proto (asegúrate de instalar requirements.txt primero)
+python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. chord.proto
