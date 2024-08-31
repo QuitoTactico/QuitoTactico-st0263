@@ -161,6 +161,23 @@ class Node:
         else:
             print("no hay archivos almacenados en este nodo")
 
+    def display_info(self):
+        #mostramos la finger table, el predecesor, el sucesor y la configuración actual
+        #muy útil para debug
+        print("\n=== Información del Nodo ===")
+        print(f"id: {self.id} (IP: {self.ip}, Puerto: {self.port})\n")
+        print("Sucesor:")
+        print(f"  id: {self.successor.id}, IP: {self.successor.ip}, Puerto: {self.successor.port}\n")
+        print("Predecesor:")
+        if self.predecessor:
+            print(f"  id: {self.predecessor.id}, IP: {self.predecessor.ip}, Puerto: {self.predecessor.port}\n")
+        else:
+            print("  Ninguno\n")
+        print("Finger Table:")
+        for start, node in self.finger_table:
+            print(f"  start: {start}, id: {node.id}, IP: {node.ip}, Puerto: {node.port}\n")
+        print("===========================\n")
+
 def main():
     #leemos la configuración desde el archivo JSON
     with open('config.json', 'r') as f:
@@ -199,6 +216,8 @@ def main():
             node.lookup_file(filename)
         elif command == "list":
             node.list_files()
+        elif command == "info":
+            node.display_info()
 
 if __name__ == '__main__':
     main()
