@@ -4,20 +4,18 @@ import chord_pb2_grpc as pb2_grpc
 import chord_pb2 as pb2
 import hashlib
 import threading
-import sys
 import time
 import json
-from typing import Optional, Dict, List
 
 def hash_key(key: str) -> int:
     #hacemos el hash del id para convertirlo en un número que se usa en el espacio de claves
     return int(hashlib.sha1(key.encode()).hexdigest(), 16) % 2**16
 
 class ChordService(pb2_grpc.ChordServiceServicer):
-    def __init__(self, node: 'Node') -> None:
+    def __init__(self, node) -> None:
         #inicializamos el servicio chord con el nodo asociado
         self.node = node
-        self.files: Dict[str, str] = {}  #guardamos los archivos en este diccionario (simulados)
+        self.files = {}  #guardamos los archivos en este diccionario (simulados)
 
     def FindSuccessor(self, request: pb2.Node, context: grpc.ServicerContext) -> pb2.Node:
         #primero vamos a buscar el sucesor de un id en el anillo chord
@@ -72,7 +70,7 @@ class ChordService(pb2_grpc.ChordServiceServicer):
         else:
             return pb2.FileResponse(message=f"archivo '{filename}' no encontrado")
 
-def serve(node: 'Node') -> None:
+def serve(node) -> None:
     #configuramos el servidor gRPC y lo ponemos a escuchar conexiones
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     pb2_grpc.add_ChordServiceServicer_to_server(ChordService(node), server)
@@ -88,9 +86,9 @@ class Node:
         self.port = port
         self.id = id
         self.update_interval = update_interval
-        self.successor: 'Node' = self  #sucesor inicial es el mismo nodo
-        self.predecessor: Optional['Node'] = None
-        self.finger_table: List[tuple[int, 'Node']] = []  #inicializamos la finger table vacía
+        self.successor = self  #sucesor inicial es el mismo nodo
+        self.predecessor = None
+        self.finger_table = []  #inicializamos la finger table vacía
         self.init_finger_table()  #y luego la llenamos
 
     def init_finger_table(self) -> None:
@@ -116,7 +114,7 @@ class Node:
                 return self.finger_table[i][1]
         return self
 
-    def join_network(self, existing_node: 'Node') -> None:
+    def join_network(self, existing_node) -> None:
         #nos unimos a la red contactando a un nodo existente para encontrar nuestro lugar
         with grpc.insecure_channel(f'{existing_node.ip}:{existing_node.port}') as channel:
             stub = pb2_grpc.ChordServiceStub(channel)
