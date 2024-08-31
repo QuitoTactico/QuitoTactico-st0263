@@ -77,6 +77,7 @@ def serve(node):
     pb2_grpc.add_ChordServiceServicer_to_server(ChordService(node), server)
     server.add_insecure_port(f'{node.ip}:{node.port}')
     server.start()
+    print(f"servidor gRPC iniciado en {node.ip}:{node.port}")
     server.wait_for_termination()
 
 class Node:
@@ -192,8 +193,16 @@ def main():
     bootstrap_ip = config.get("bootstrap_ip")
     bootstrap_port = config.get("bootstrap_port")
 
-    #si hay un bootstrap_ip y bootstrap_port configurado y no están vacíos, unimos el nodo a la red existente
-    if bootstrap_ip and bootstrap_port:
+    #iniciamos el servidor gRPC en un hilo separado antes de hacer cualquier otra cosa
+    threading.Thread(target=serve, args=(node,)).start()
+
+    #esperamos un momento para asegurarnos de que el servidor esté completamente iniciado
+    time.sleep(2)
+
+    #evitamos que el nodo se conecte a sí mismo
+    if bootstrap_ip == ip and int(bootstrap_port) == int(port):
+        print("nodo configurado para conectarse a sí mismo; operando como el primer nodo en la red")
+    elif bootstrap_ip and bootstrap_port:
         if bootstrap_ip != "" and bootstrap_port != "":
             existing_node_id = hash_key(f'{bootstrap_ip}:{bootstrap_port}')
             existing_node = Node(bootstrap_ip, int(bootstrap_port), existing_node_id, update_interval)
@@ -201,8 +210,7 @@ def main():
     else:
         print(f"nodo {node.id} es el primer nodo en la red")
 
-    #iniciamos el servidor gRPC y el proceso de estabilización en hilos separados
-    threading.Thread(target=serve, args=(node,)).start()
+    #iniciamos el proceso de estabilización en un hilo separado
     threading.Thread(target=node.stabilize).start()
 
     #bucle para manejar los comandos de la consola
