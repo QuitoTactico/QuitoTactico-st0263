@@ -1,4 +1,19 @@
-pip install -r requirements.txt
+- PARA CONFIGURAR MÁQUINA EC2:
+sudo apt-get update
+sudo apt-get install python3-pip
+sudo apt-get install git
+git clone https://github.com/QuitoTactico/QuitoTactico-st0263
+cd QuitoTactico-st0263
+pip3 install -r requirements.txt
 
-Si quieres compilar el proto (asegúrate de instalar requirements.txt primero)
+- PARA INICIAR LA PRIMER MÁQUINA:
+python node.py <IP_DE_LA_PRIMERA_MAQUINA> <PUERTO>
+
+- PARA INICIAR LAS DEMÁS MÁQUINAS:
+python node.py <IP_DE_LA_SEGUNDA_MAQUINA> <PUERTO> <IP_DE_LA_PRIMERA_MAQUINA> <PUERTO_PRIMER_NODO>
+
+
+--- MISCELÁNEO ---
+
+- Si quieres compilar el proto (asegúrate de instalar requirements.txt primero)
 python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. chord.proto
