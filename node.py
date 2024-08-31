@@ -124,16 +124,20 @@ class Node:
         #hacemos la estabilización periódica para actualizar sucesor y finger table
         while True:
             try:
-                with grpc.insecure_channel(f'{self.successor.ip}:{self.successor.port}') as channel:
-                    stub = pb2_grpc.ChordServiceStub(channel)
-                    x = stub.FindSuccessor(pb2.Node(id=self.successor.id)).id
-                    if x != self.successor.id and (self.id < x < self.successor.id or
-                                                   (self.id > self.successor.id and (x > self.id or x < self.successor.id))):
-                        self.successor = x
-                        print(f"nodo {self.id} actualizó su sucesor a {x}")
-                    
-                    stub.Notify(pb2.Node(id=self.id, ip=self.ip, port=self.port))
-                self.update_finger_table()  #actualizamos la finger table periódicamente
+                # Evitar estabilización si el nodo es su propio sucesor (indicador de que es el único nodo en la red)
+                if self.successor == self:
+                    print("Nodo es el único en la red, omitiendo estabilización")
+                else:
+                    with grpc.insecure_channel(f'{self.successor.ip}:{self.successor.port}') as channel:
+                        stub = pb2_grpc.ChordServiceStub(channel)
+                        x = stub.FindSuccessor(pb2.Node(id=self.successor.id)).id
+                        if x != self.successor.id and (self.id < x < self.successor.id or
+                                                       (self.id > self.successor.id and (x > self.id or x < self.successor.id))):
+                            self.successor = x
+                            print(f"nodo {self.id} actualizó su sucesor a {x}")
+                        
+                        stub.Notify(pb2.Node(id=self.id, ip=self.ip, port=self.port))
+                    self.update_finger_table()  #actualizamos la finger table periódicamente
             except Exception as e:
                 print(f"error en estabilización: {e}")
             time.sleep(self.update_interval)
