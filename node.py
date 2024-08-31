@@ -9,14 +9,17 @@ import time
 import json
 
 def hash_key(key):
+    #hacemos el hash del id para convertirlo en un número que se usa en el espacio de claves
     return int(hashlib.sha1(key.encode()).hexdigest(), 16) % 2**16
 
 class ChordService(pb2_grpc.ChordServiceServicer):
     def __init__(self, node):
+        #inicializamos el servicio chord con el nodo asociado
         self.node = node
-        self.files = {}  #diccionario para guardar archivos (simulados)
-    
+        self.files = {}  #guardamos los archivos en este diccionario (simulados)
+
     def FindSuccessor(self, request, context):
+        #primero vamos a buscar el sucesor de un id en el anillo chord
         id = request.id
         if self.node.predecessor and self.node.predecessor.id < self.node.id:
             if self.node.predecessor.id < id <= self.node.id:
@@ -27,11 +30,17 @@ class ChordService(pb2_grpc.ChordServiceServicer):
         if self.node.id < id <= self.node.successor.id:
             return self.node.successor
         else:
-            with grpc.insecure_channel(f'{self.node.successor.ip}:{self.node.successor.port}') as channel:
-                stub = pb2_grpc.ChordServiceStub(channel)
-                return stub.FindSuccessor(pb2.Node(id=id, ip=self.node.ip, port=self.node.port))
+            #usamos la finger table para saltar al nodo más cercano que precede al id
+            closest_preceding_node = self.node.closest_preceding_finger(id)
+            if closest_preceding_node.id != self.node.id:
+                with grpc.insecure_channel(f'{closest_preceding_node.ip}:{closest_preceding_node.port}') as channel:
+                    stub = pb2_grpc.ChordServiceStub(channel)
+                    return stub.FindSuccessor(pb2.Node(id=id))
+            else:
+                return self.node.successor
 
     def Notify(self, request, context):
+        #el nodo notifica a su sucesor para ver si debe actualizar su predecesor
         predecessor_id = request.id
         if self.node.predecessor is None or \
            (self.node.predecessor.id < predecessor_id < self.node.id) or \
@@ -41,11 +50,13 @@ class ChordService(pb2_grpc.ChordServiceServicer):
         return pb2.Empty()
 
     def StoreFile(self, request, context):
+        #guardamos el archivo en este nodo y lo simulamos con un mensaje
         filename = request.filename
         self.files[filename] = f"Transfiriendo {filename}... Archivo transferido"
         return pb2.FileResponse(message=f"archivo '{filename}' almacenado en el nodo {self.node.id}")
 
     def LookupFile(self, request, context):
+        #buscamos el archivo en el nodo actual y respondemos si está aquí
         filename = request.filename
         if filename in self.files:
             return pb2.FileResponse(message=f"archivo '{filename}' encontrado en nodo {self.node.id} ({self.node.ip}:{self.node.port})")
@@ -53,6 +64,7 @@ class ChordService(pb2_grpc.ChordServiceServicer):
             return pb2.FileResponse(message=f"archivo '{filename}' no encontrado")
 
     def TransferFile(self, request, context):
+        #simulamos la transferencia de un archivo (es solo un mensaje)
         filename = request.filename
         if filename in self.files:
             return pb2.FileResponse(message=self.files[filename])
@@ -60,6 +72,7 @@ class ChordService(pb2_grpc.ChordServiceServicer):
             return pb2.FileResponse(message=f"archivo '{filename}' no encontrado")
 
 def serve(node):
+    #configuramos el servidor gRPC y lo ponemos a escuchar conexiones
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     pb2_grpc.add_ChordServiceServicer_to_server(ChordService(node), server)
     server.add_insecure_port(f'{node.ip}:{node.port}')
@@ -68,19 +81,47 @@ def serve(node):
 
 class Node:
     def __init__(self, ip, port, id, update_interval):
+        #inicializamos el nodo con su ip, puerto, id, intervalo de actualización y demás
         self.ip = ip
         self.port = port
         self.id = id
         self.update_interval = update_interval
-        self.successor = self
+        self.successor = self  #sucesor inicial es el mismo nodo
         self.predecessor = None
+        self.finger_table = []  #inicializamos la finger table vacía
+        self.init_finger_table()  #y luego la llenamos
+
+    def init_finger_table(self):
+        #llenamos la finger table con las posiciones iniciales (con nosotros mismos como nodo inicial)
+        m = 16  #suponemos un espacio de clave de 2^16
+        for i in range(m):
+            start = (self.id + 2**i) % 2**m
+            self.finger_table.append((start, self))
+
+    def update_finger_table(self):
+        #actualizamos la finger table encontrando el sucesor correcto para cada entrada
+        m = 16  #asumimos un espacio de clave de 2^16
+        for i in range(m):
+            start = (self.id + 2**i) % 2**m
+            with grpc.insecure_channel(f'{self.successor.ip}:{self.successor.port}') as channel:
+                stub = pb2_grpc.ChordServiceStub(channel)
+                self.finger_table[i] = (start, stub.FindSuccessor(pb2.Node(id=start)))
+
+    def closest_preceding_finger(self, id):
+        #buscamos en la finger table el nodo más cercano que precede al id
+        for i in range(len(self.finger_table)-1, -1, -1):
+            if self.id < self.finger_table[i][1].id < id:
+                return self.finger_table[i][1]
+        return self
 
     def join_network(self, existing_node):
+        #nos unimos a la red contactando a un nodo existente para encontrar nuestro lugar
         with grpc.insecure_channel(f'{existing_node.ip}:{existing_node.port}') as channel:
             stub = pb2_grpc.ChordServiceStub(channel)
             self.successor = stub.FindSuccessor(pb2.Node(ip=self.ip, port=self.port, id=self.id))
 
     def stabilize(self):
+        #hacemos la estabilización periódica para actualizar sucesor y finger table
         while True:
             try:
                 with grpc.insecure_channel(f'{self.successor.ip}:{self.successor.port}') as channel:
@@ -92,23 +133,27 @@ class Node:
                         print(f"nodo {self.id} actualizó su sucesor a {x}")
                     
                     stub.Notify(pb2.Node(id=self.id, ip=self.ip, port=self.port))
+                self.update_finger_table()  #actualizamos la finger table periódicamente
             except Exception as e:
                 print(f"error en estabilización: {e}")
             time.sleep(self.update_interval)
 
     def store_file(self, filename):
+        #almacenamos el archivo en el sucesor (simulado)
         with grpc.insecure_channel(f'{self.successor.ip}:{self.successor.port}') as channel:
             stub = pb2_grpc.ChordServiceStub(channel)
             response = stub.StoreFile(pb2.FileRequest(filename=filename))
             print(response.message)
 
     def lookup_file(self, filename):
+        #buscamos un archivo y mostramos dónde se encuentra
         with grpc.insecure_channel(f'{self.successor.ip}:{self.successor.port}') as channel:
             stub = pb2_grpc.ChordServiceStub(channel)
             response = stub.LookupFile(pb2.FileRequest(filename=filename))
             print(response.message)
 
     def list_files(self):
+        #listamos los archivos almacenados en este nodo
         if hasattr(self, 'files') and self.files:
             print("archivos almacenados en este nodo:")
             for filename in self.files:
@@ -117,6 +162,7 @@ class Node:
             print("no hay archivos almacenados en este nodo")
 
 def main():
+    #leemos la configuración desde el archivo JSON
     with open('config.json', 'r') as f:
         config = json.load(f)
     
@@ -130,6 +176,7 @@ def main():
     bootstrap_ip = config.get("bootstrap_ip")
     bootstrap_port = config.get("bootstrap_port")
 
+    #si hay un bootstrap_ip y bootstrap_port configurado y no están vacíos, unimos el nodo a la red existente
     if bootstrap_ip and bootstrap_port:
         if bootstrap_ip != "" and bootstrap_port != "":
             existing_node = Node(bootstrap_ip, int(bootstrap_port), None, update_interval)
@@ -137,9 +184,11 @@ def main():
     else:
         print(f"nodo {node.id} es el primer nodo en la red")
 
+    #iniciamos el servidor gRPC y el proceso de estabilización en hilos separados
     threading.Thread(target=serve, args=(node,)).start()
     threading.Thread(target=node.stabilize).start()
 
+    #bucle para manejar los comandos de la consola
     while True:
         command = input("> ")
         if command.startswith("store"):
