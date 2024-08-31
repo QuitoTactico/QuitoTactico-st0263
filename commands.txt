@@ -6,11 +6,17 @@ git clone https://github.com/QuitoTactico/QuitoTactico-st0263
 cd QuitoTactico-st0263
 pip3 install -r requirements.txt
 
-- PARA INICIAR LA PRIMER MÁQUINA:
-python3 node.py <IP_DE_LA_PRIMERA_MAQUINA> <PUERTO>
+- PARA INICIAR EL PRIMER NODO:
+sudo nano config.json
+(Agregar la IP propia en "own_ip" y el puerto en "own_port")
+(Dejar en blanco "bootstrap_ip" y "bootstrap_port", ya sea no definiéndolos o dejándolos como "")
+python3 node.py
 
-- PARA INICIAR LAS DEMÁS MÁQUINAS:
-python3 node.py <IP_DE_LA_SEGUNDA_MAQUINA> <PUERTO> <IP_DE_LA_PRIMERA_MAQUINA> <PUERTO_PRIMER_NODO>
+- PARA INICIAR LOS NODOS SIGUIENTES:
+sudo nano config.json
+(Agregar la IP propia en "own_ip" y el puerto en "own_port")
+(Agregar la IP a la que se conectará en "bootsrap_ip" y el puerto en "bootstrap_port")
+python3 node.py
 
 
 --- MISCELÁNEO ---

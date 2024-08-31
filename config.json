@@ -1,0 +1,7 @@
+{
+    "update_interval": 5,
+    "own_ip": "172.31.93.30",
+    "own_port": 50001,
+    "bootstrap_ip": "172.31.93.40",
+    "bootstrap_port": 50002
+}
