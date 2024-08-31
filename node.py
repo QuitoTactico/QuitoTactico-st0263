@@ -30,7 +30,7 @@ class ChordService(pb2_grpc.ChordServiceServicer):
         #buscar un archivo en el nodo
         filename = request.filename
         if filename in self.files:
-            return pb2.FileResponse(message=self.files[filename])
+            return pb2.FileResponse(message=f"archivo '{filename}' encontrado en nodo {self.node.id} ({self.node.ip}:{self.node.port})")
         else:
             return pb2.FileResponse(message=f"archivo '{filename}' no encontrado")
 
@@ -78,6 +78,15 @@ class Node:
             response = stub.LookupFile(pb2.FileRequest(filename=filename))
             print(response.message)
 
+    def list_files(self):
+        #listar archivos almacenados en el nodo actual
+        if hasattr(self, 'files') and self.files:
+            print("archivos almacenados en este nodo:")
+            for filename in self.files:
+                print(f" - {filename}")
+        else:
+            print("no hay archivos almacenados en este nodo")
+
 def main():
     ip = sys.argv[1]
     port = int(sys.argv[2])
@@ -103,6 +112,9 @@ def main():
             #comando para buscar archivo
             _, filename = command.split()
             node.lookup_file(filename)
+        elif command == "list":
+            #comando para listar los archivos almacenados en el nodo
+            node.list_files()
 
 if __name__ == '__main__':
     main()
