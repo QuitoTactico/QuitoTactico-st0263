@@ -5,6 +5,10 @@ import chord_pb2 as pb2
 import hashlib
 import threading
 import sys
+import time
+
+def hash_key(key):
+    return int(hashlib.sha1(key.encode()).hexdigest(), 16) % 2**16
 
 class ChordService(pb2_grpc.ChordServiceServicer):
     def __init__(self, node):
@@ -13,11 +17,29 @@ class ChordService(pb2_grpc.ChordServiceServicer):
     
     def FindSuccessor(self, request, context):
         #lógica para encontrar el sucesor en el anillo chord
-        #por ahora devolvemos el mismo nodo para simplificar
-        return self.node
+        id = request.id
+        if self.node.predecessor and self.node.predecessor.id < self.node.id:
+            if self.node.predecessor.id < id <= self.node.id:
+                return self.node
+        elif self.node.predecessor and self.node.predecessor.id > self.node.id:
+            if id > self.node.predecessor.id or id <= self.node.id:
+                return self.node
+        if self.node.id < id <= self.node.successor.id:
+            return self.node.successor
+        else:
+            # reenviar la solicitud al sucesor
+            with grpc.insecure_channel(f'{self.node.successor.ip}:{self.node.successor.port}') as channel:
+                stub = pb2_grpc.ChordServiceStub(channel)
+                return stub.FindSuccessor(pb2.Node(id=id, ip=self.node.ip, port=self.node.port))
 
     def Notify(self, request, context):
-        #notificar que un nodo se ha unido
+        #notificar al nodo sobre un posible predecesor
+        predecessor_id = request.id
+        if self.node.predecessor is None or \
+           (self.node.predecessor.id < predecessor_id < self.node.id) or \
+           (self.node.predecessor.id > self.node.id and (predecessor_id > self.node.predecessor.id or predecessor_id < self.node.id)):
+            self.node.predecessor = request
+            print(f"nodo {self.node.id} actualizó su predecesor a {request.id}")
         return pb2.Empty()
 
     def StoreFile(self, request, context):
@@ -64,6 +86,24 @@ class Node:
             stub = pb2_grpc.ChordServiceStub(channel)
             self.successor = stub.FindSuccessor(pb2.Node(ip=self.ip, port=self.port, id=self.id))
 
+    def stabilize(self):
+        #proceso de estabilización
+        while True:
+            try:
+                with grpc.insecure_channel(f'{self.successor.ip}:{self.successor.port}') as channel:
+                    stub = pb2_grpc.ChordServiceStub(channel)
+                    x = stub.FindSuccessor(pb2.Node(id=self.successor.id)).id
+                    if x != self.successor.id and (self.id < x < self.successor.id or
+                                                   (self.id > self.successor.id and (x > self.id or x < self.successor.id))):
+                        self.successor = x
+                        print(f"nodo {self.id} actualizó su sucesor a {x}")
+                    
+                    # notificar al sucesor sobre este nodo
+                    stub.Notify(pb2.Node(id=self.id, ip=self.ip, port=self.port))
+            except Exception as e:
+                print(f"error en estabilización: {e}")
+            time.sleep(5)  # ajustar el intervalo según sea necesario
+
     def store_file(self, filename):
         #guardar archivo en el sucesor
         with grpc.insecure_channel(f'{self.successor.ip}:{self.successor.port}') as channel:
@@ -90,7 +130,7 @@ class Node:
 def main():
     ip = sys.argv[1]
     port = int(sys.argv[2])
-    id = int(hashlib.sha1(f'{ip}:{port}'.encode()).hexdigest(), 16) % 2**16
+    id = hash_key(f'{ip}:{port}')
     node = Node(ip, port, id)
 
     if len(sys.argv) > 3:
@@ -100,7 +140,9 @@ def main():
         existing_node = Node(existing_node_ip, existing_node_port, None)
         node.join_network(existing_node)
 
+    #procesos en hilos separados:
     threading.Thread(target=serve, args=(node,)).start()  #ejecuta la función serve en un hilo separado
+    threading.Thread(target=node.stabilize).start()  #inicia el proceso de estabilización
 
     while True:
         command = input("> ")
