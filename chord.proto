@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+service ChordService {
+  rpc FindSuccessor(Node) returns (Node);
+  rpc Notify(Node) returns (Empty);
+  rpc StoreFile(FileRequest) returns (FileResponse);
+  rpc LookupFile(FileRequest) returns (FileResponse);
+  rpc TransferFile(FileRequest) returns (FileResponse);
+}
+
+message Node {
+  string ip = 1;
+  int32 port = 2;
+  int32 id = 3;
+}
+
+message FileRequest {
+  string filename = 1;
+}
+
+message FileResponse {
+  string message = 1;
+}
+
+message Empty {}
