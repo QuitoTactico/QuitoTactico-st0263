@@ -163,7 +163,6 @@ class Node:
 
     def display_info(self):
         #mostramos la finger table, el predecesor, el sucesor y la configuración actual
-        #muy útil para debug
         print("\n=== Información del Nodo ===")
         print(f"id: {self.id} (IP: {self.ip}, Puerto: {self.port})\n")
         print("Sucesor:")
@@ -196,7 +195,8 @@ def main():
     #si hay un bootstrap_ip y bootstrap_port configurado y no están vacíos, unimos el nodo a la red existente
     if bootstrap_ip and bootstrap_port:
         if bootstrap_ip != "" and bootstrap_port != "":
-            existing_node = Node(bootstrap_ip, int(bootstrap_port), None, update_interval)
+            existing_node_id = hash_key(f'{bootstrap_ip}:{bootstrap_port}')
+            existing_node = Node(bootstrap_ip, int(bootstrap_port), existing_node_id, update_interval)
             node.join_network(existing_node)
     else:
         print(f"nodo {node.id} es el primer nodo en la red")
