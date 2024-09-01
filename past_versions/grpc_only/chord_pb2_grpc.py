@@ -34,6 +34,16 @@ class ChordServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
+        self.FindSuccessor = channel.unary_unary(
+                '/ChordService/FindSuccessor',
+                request_serializer=chord__pb2.Node.SerializeToString,
+                response_deserializer=chord__pb2.Node.FromString,
+                _registered_method=True)
+        self.Notify = channel.unary_unary(
+                '/ChordService/Notify',
+                request_serializer=chord__pb2.Node.SerializeToString,
+                response_deserializer=chord__pb2.Empty.FromString,
+                _registered_method=True)
         self.StoreFile = channel.unary_unary(
                 '/ChordService/StoreFile',
                 request_serializer=chord__pb2.FileRequest.SerializeToString,
@@ -53,6 +63,18 @@ class ChordServiceStub(object):
 
 class ChordServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
+
+    def FindSuccessor(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Notify(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
 
     def StoreFile(self, request, context):
         """Missing associated documentation comment in .proto file."""
@@ -75,6 +97,16 @@ class ChordServiceServicer(object):
 
 def add_ChordServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
+            'FindSuccessor': grpc.unary_unary_rpc_method_handler(
+                    servicer.FindSuccessor,
+                    request_deserializer=chord__pb2.Node.FromString,
+                    response_serializer=chord__pb2.Node.SerializeToString,
+            ),
+            'Notify': grpc.unary_unary_rpc_method_handler(
+                    servicer.Notify,
+                    request_deserializer=chord__pb2.Node.FromString,
+                    response_serializer=chord__pb2.Empty.SerializeToString,
+            ),
             'StoreFile': grpc.unary_unary_rpc_method_handler(
                     servicer.StoreFile,
                     request_deserializer=chord__pb2.FileRequest.FromString,
@@ -100,6 +132,60 @@ def add_ChordServiceServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class ChordService(object):
     """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def FindSuccessor(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ChordService/FindSuccessor',
+            chord__pb2.Node.SerializeToString,
+            chord__pb2.Node.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Notify(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/ChordService/Notify',
+            chord__pb2.Node.SerializeToString,
+            chord__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
 
     @staticmethod
     def StoreFile(request,
