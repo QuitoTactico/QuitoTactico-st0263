@@ -21,6 +21,8 @@ class Node:
         self.predecessor = {}  #predecesor inicial como un diccionario vacío
         self.files = {}  #diccionario para almacenar archivos
         self.config = config #configuración del nodo, bootstrap
+        self.successor_fails = 0  #contador de fallos del sucesor
+        self.predecessor_fails = 0  #contador de fallos del predecesor
 
     def bootstrap(self):
         bootstrap_ip = self.config.get("bootstrap_ip")
@@ -42,7 +44,6 @@ class Node:
             self.successor = self.to_dict()
             self.predecessor = self.to_dict()
             print("Nodo inicial de la red creado.")
-
 
     def is_in_interval(self, id_to_check: int, start: int, end: int) -> bool:
         #verifica si id_to_check está en el intervalo (start, end]
@@ -96,7 +97,6 @@ class Node:
 
     def stabilize(self):
         #estabiliza el nodo verificando su sucesor y predecesor
-        tries = 0
         while True:
             try:
                 #preguntamos al sucesor por su predecesor
@@ -119,13 +119,12 @@ class Node:
                     notify_url = f"http://{self.successor['ip']}:{self.successor['port']}/notify"
                     requests.post(notify_url, json=self.to_dict())
                 
-                tries = 0
+                self.successor_fails = 0  #resetea el contador de fallos
             except:
                 print(f"Error durante estabilización")
-                #print(f"Error durante estabilización {e}") #para debug
-                tries += 1
-                if tries >= 3:
-                    print("Demasiados errores de estabilización, ", end="")
+                self.successor_fails += 1
+                if self.successor_fails >= 3:
+                    print("Demasiados errores de estabilización con sucesor, ", end="")
                     if self.predecessor:
                         print("poniendo a predecesor como sucesor")
                         self.successor = self.predecessor
@@ -149,9 +148,19 @@ class Node:
                     url = f"http://{self.predecessor['ip']}:{self.predecessor['port']}/ping"
                     response = requests.get(url)
                     response.raise_for_status()
+                    self.predecessor_fails = 0  #resetea el contador de fallos
                 except requests.exceptions.RequestException:
                     print(f"Predecesor {self.predecessor['id']} no responde. Eliminando predecesor.")
                     self.predecessor = {}
+                    self.predecessor_fails += 1
+                    if self.predecessor_fails >= 3:
+                        print("Demasiados errores con predecesor. ", end="")
+                        if self.successor:
+                            print("poniendo a sucesor como predecesor")
+                            self.predecessor = self.successor
+                        else:
+                            print("comenzando con bootstrap")
+                            self.bootstrap()
             time.sleep(self.update_interval)
 
     def to_dict(self) -> dict:
