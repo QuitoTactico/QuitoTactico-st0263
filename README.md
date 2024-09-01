@@ -27,7 +27,7 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
 ### 1.2. Aspectos NO cumplidos o desarrollados de la actividad propuesta por el profesor (requerimientos funcionales y no funcionales):
 - El sistema simula la transferencia de archivos, pero no realiza transferencias reales de datos binarios.
 - No se implementó la solución usando un Message Oriented Middleware (MOM) por la razón:
--     Facilidad de implementación: añadir un middleware que procese las solicitudes temporalmente, y se las envíe a los o el nodo respectivo, a veces puede ser complicado, por lo que para esta solución optamos por un modelo de peticiones API REST que procese las solicitudes directamente
+    - Facilidad de implementación: añadir un middleware que procese las solicitudes temporalmente, y se las envíe a los o el nodo respectivo, a veces puede ser complicado, por lo que para esta solución optamos por un modelo de peticiones API REST que procese las solicitudes directamente
 - Se pensaron en los beneficios que recurría implementar mom, tales como: reducir la interdependencia de nodos, ya que si uno se tardaba en su solicitud, los demás tenían este mismo comportamiento, o también que tener un middleware pued llevar a que la solución sea más escalable aumentando la cantidad de nodos sin comprometer la integridad de uno respecto al otro a la hora de procesar la solicitud o enviarla.
 ---
 
