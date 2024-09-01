@@ -134,19 +134,28 @@ class Node:
             print("  No hay archivos almacenados")
         print("===========================\n")
 
-
-@app.route('/find_successor', methods=['POST'])
-def find_successor():
-    #maneja la solicitud para encontrar el sucesor a través de REST
-    data = request.json
-    if 'id' not in data:
-        return jsonify({'error': 'Missing id'}), 400
-    
-    node_id = data['id']
-    result = node.find_successor(node_id)
-    if 'error' in result:
-        return jsonify(result), 500
-    return jsonify(result)
+def find_successor(self, node_id: int) -> dict:
+    #si el id está entre el nodo actual y su sucesor, entonces el sucesor es el nodo que buscamos
+    if self.successor and (self.id < node_id <= self.successor['id'] or
+                           (self.successor['id'] < self.id and (node_id > self.id or node_id <= self.successor['id']))):
+        return self.successor
+    elif self.id == node_id:
+        #si el nodo actual es su propio sucesor (solo en red o el primer nodo)
+        return self.to_dict()
+    else:
+        #si no, preguntamos al nodo más cercano de nuestra finger table
+        closest_preceding_node = self.closest_preceding_finger(node_id)
+        if closest_preceding_node['id'] == self.id:
+            #si el nodo más cercano es el propio nodo, evitamos hacer la llamada a sí mismo
+            return self.to_dict()
+        url = f"http://{closest_preceding_node['ip']}:{closest_preceding_node['port']}/find_successor"
+        try:
+            response = requests.post(url, json={'id': node_id})
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"Error al contactar al nodo más cercano: {e}")
+            return {'error': 'Failed to find successor'}
 
 @app.route('/notify', methods=['POST'])
 def notify():
@@ -195,6 +204,13 @@ def main() -> None:
             url = f"http://{bootstrap_ip}:{bootstrap_port}/find_successor"
             response = requests.post(url, json={'id': node.id})
             node.successor = response.json()
+            if node.successor['id'] == node.id:
+                #si el nodo se asignó a sí mismo como sucesor (primer nodo en la red)
+                node.predecessor = node.to_dict()
+    else:
+        #si este es el primer nodo, se establece como su propio sucesor y predecesor
+        node.successor = node.to_dict()
+        node.predecessor = node.to_dict()
 
     #inicia los servidores REST y gRPC, y el proceso de estabilización
     threading.Thread(target=serve_rest).start()
