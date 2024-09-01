@@ -17,8 +17,8 @@ class Node:
         self.port = port  #puerto del nodo donde estará escuchando
         self.id = id  #id del nodo calculado con hash
         self.update_interval = update_interval  #intervalo de estabilización
-        self.successor = None  #el sucesor inicial es None
-        self.predecessor = None  #el predecesor inicial es None
+        self.successor = {}  #sucesor inicial como un diccionario vacío
+        self.predecessor = {}  #predecesor inicial como un diccionario vacío
         self.files = {}  #diccionario para almacenar archivos
         self.m = m  #número de bits en el espacio de identificadores
         self.finger_table = [None] * self.m  #inicializamos la finger table
@@ -155,7 +155,7 @@ class Node:
         print("===========================\n")
 
 
-# ---------------------------------------------- REST API ----------------------------------------------
+#---------------------------------------------- REST API ----------------------------------------------
 
 @app.route('/find_successor', methods=['POST'])
 def find_successor():
