@@ -82,7 +82,7 @@ class Node:
             print(f"Predecesor actualizado: {self.predecessor['id']} ({self.predecessor['ip']}:{self.predecessor['port']})")
         
         #si el sucesor es el propio nodo, lo actualizamos al nuevo predecesor
-        if self.successor['id'] == self.id:
+        if self.successor.get('id') is None or self.successor['id'] == self.id:
             self.successor = new_predecessor
             print(f"Sucesor actualizado: {self.successor['id']} ({self.successor['ip']}:{self.successor['port']})")
 
