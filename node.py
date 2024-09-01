@@ -91,7 +91,7 @@ class Node:
         while True:
             for i in range(self.m):
                 finger_id = (self.id + 2 ** i) % (2 ** self.m)
-                #find_sucessor siempre debería retornar un diccionario válido, sino, retornamos 
+                #find_sucessor siempre debería retornar un diccionario válido, sino, retornamos el error del sucesor con su id
                 successor = self.find_successor(finger_id)
                 if successor and 'id' in successor:
                     self.finger_table[i] = successor
