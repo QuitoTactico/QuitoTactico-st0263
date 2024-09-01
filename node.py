@@ -89,7 +89,8 @@ class Node:
                 notify_url = f"http://{self.successor['ip']}:{self.successor['port']}/notify"
                 requests.post(notify_url, json=self.to_dict())
             except requests.exceptions.RequestException as e:
-                print(f"Error durante estabilización: {e}")
+                #print(f"Error durante estabilización: {e}") #para debug ampliado
+                print(f"Error durante estabilización")
             time.sleep(self.update_interval)
 
     def notify(self, new_predecessor: dict) -> None:
@@ -141,7 +142,7 @@ class Node:
             print(f"  id: {self.predecessor['id']}, ip: {self.predecessor['ip']}, puerto: {self.predecessor['port']}\n")
         else:
             print("  Ninguno\n")
-        print("Archivos almacenados:")
+        print("\nArchivos almacenados:")
         if self.files:
             for filename in self.files:
                 print(f"  - {filename}")
