@@ -41,11 +41,11 @@ class Node:
                 return {'error': 'Failed to find successor'}
 
     def closest_preceding_finger(self, node_id: int) -> dict:
-        #buscamos el nodo más cercano que precede al id que estamos buscando
+        # buscamos el nodo más cercano que precede al id que estamos buscando
         for i in range(self.m - 1, -1, -1):
-            if self.finger_table[i] and self.id < self.finger_table[i]['id'] < node_id:
+            if self.finger_table[i] and 'id' in self.finger_table[i] and self.id < self.finger_table[i]['id'] < node_id:
                 return self.finger_table[i]
-        return self.to_dict()  #si no encontramos uno más cercano, devolvemos el propio nodo
+        return self.to_dict()  # si no encontramos uno más cercano, devolvemos el propio nodo
 
     def stabilize(self):
         #estabiliza el nodo verificando su sucesor y predecesor
@@ -72,11 +72,16 @@ class Node:
             self.predecessor = new_predecessor
 
     def fix_fingers(self):
-        #ciclo que repara la finger table periódicamente
+        # ciclo que repara la finger table periódicamente
         while True:
             for i in range(self.m):
                 finger_id = (self.id + 2 ** i) % (2 ** self.m)
-                self.finger_table[i] = self.find_successor(finger_id)
+                # Asegúrate de que `find_successor` siempre devuelve un diccionario válido
+                successor = self.find_successor(finger_id)
+                if successor and 'id' in successor:
+                    self.finger_table[i] = successor
+                else:
+                    print(f"Error al encontrar sucesor para finger {i} con id {finger_id}")
             time.sleep(self.update_interval)
 
     def check_predecessor(self):
