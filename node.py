@@ -30,10 +30,10 @@ class Node:
                                 (node_id > self.id or node_id <= self.successor['id']))):
             return self.successor
         elif self.id == node_id:
-            #si el nodo actual es su propio sucesor (solo en red o el primer nodo)
+            #si el nodo actual es su propio sucesor (caso típico para el primer nodo)
             return self.to_dict()
         else:
-            #si no, preguntamos al nodo más cercano de nuestra finger table
+            #si no, buscamos el nodo más cercano en la finger table
             closest_preceding_node = self.closest_preceding_finger(node_id)
             if closest_preceding_node['id'] == self.id:
                 #si el nodo más cercano es el propio nodo, evitamos hacer la llamada a sí mismo
@@ -48,18 +48,18 @@ class Node:
                 return {'error': 'Failed to find successor'}
 
     def search(self, filename: str) -> dict:
-        #calcula el id del archivo basado en su nombre
+        #calculamos el id del archivo basado en su nombre
         file_id = hash_key(filename)
 
-        #busca el nodo responsable de almacenar el archivo usando la finger table
+        #buscamos el nodo responsable de almacenar el archivo usando la finger table
         responsible_node = self.find_successor(file_id)
         
-        #si el nodo responsable es el actual
+        #si el nodo responsable es el actual, verificamos si el archivo está presente
         if responsible_node['id'] == self.id:
             if filename in self.files:
                 return {'url': f"http://{self.ip}:{self.port}/download/{filename}"}
             else:
-                return {'error': f"Archivo '{filename}' no encontrado en nodo propio. {self.id}"}
+                return {'error': f"Archivo '{filename}' no encontrado en nodo propio ({self.id})"}
         
         #si el nodo responsable es otro, retornamos la url para descargar el archivo desde ese nodo
         return {'url': f"http://{responsible_node['ip']}:{responsible_node['port']}/download/{filename}"}
@@ -108,7 +108,7 @@ class Node:
         while True:
             for i in range(self.m):
                 finger_id = (self.id + 2 ** i) % (2 ** self.m)
-                #find_sucessor siempre debería retornar un diccionario válido, sino, retornamos el error del sucesor con su id
+                #find_sucessor siempre debería retornar un diccionario válido
                 successor = self.find_successor(finger_id)
                 if successor and 'id' in successor:
                     self.finger_table[i] = successor
@@ -139,9 +139,9 @@ class Node:
     def lookup_file(self, filename: str) -> str:
         #busca el archivo en el nodo actual
         if filename in self.files:
-            return f"Archivo '{filename}' encontrado en nodo propio. {self.id} ({self.ip}:{self.port})"
+            return f"Archivo '{filename}' encontrado en nodo propio ({self.id}) ({self.ip}:{self.port})"
         else:
-            return f"Archivo '{filename}' no encontrado en nodo propio. {self.id}"
+            return f"Archivo '{filename}' no encontrado en nodo propio ({self.id})"
 
     def display_info(self) -> None:
         #muestra información del nodo: id, ip, puerto, sucesor, predecesor y archivos almacenados
