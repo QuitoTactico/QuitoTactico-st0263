@@ -51,7 +51,7 @@ class Node:
         #buscamos el nodo más cercano que precede al id que estamos buscando
         for i in range(self.m - 1, -1, -1):
             if self.finger_table[i] and 'id' in self.finger_table[i] and self.id < self.finger_table[i]['id'] < node_id:
-                return self.finger_table[i]
+                return self.finger_table[i] #recorremos la tabla en orden inverso buscando si existe un id, necesitamos verificar que el nodo actual tenga un id menor al id del nodo en la finger table
         return self.to_dict()  #si no encontramos uno más cercano, devolvemos el propio nodo
 
     def stabilize(self):
