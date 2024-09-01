@@ -47,6 +47,23 @@ class Node:
                 print(f"Error al contactar al nodo más cercano: {e}")
                 return {'error': 'Failed to find successor'}
 
+    def search(self, filename: str) -> dict:
+        #calcula el id del archivo basado en su nombre
+        file_id = hash_key(filename)
+
+        #busca el nodo responsable de almacenar el archivo usando la finger table
+        responsible_node = self.find_successor(file_id)
+        
+        #si el nodo responsable es el actual
+        if responsible_node['id'] == self.id:
+            if filename in self.files:
+                return {'url': f"http://{self.ip}:{self.port}/download/{filename}"}
+            else:
+                return {'error': f"Archivo '{filename}' no encontrado en nodo propio. {self.id}"}
+        
+        #si el nodo responsable es otro, retornamos la url para descargar el archivo desde ese nodo
+        return {'url': f"http://{responsible_node['ip']}:{responsible_node['port']}/download/{filename}"}
+
     def closest_preceding_finger(self, node_id: int) -> dict:
         #buscamos el nodo más cercano que precede al id que estamos buscando
         for i in range(self.m - 1, -1, -1):
@@ -122,9 +139,9 @@ class Node:
     def lookup_file(self, filename: str) -> str:
         #busca el archivo en el nodo actual
         if filename in self.files:
-            return f"Archivo '{filename}' encontrado en nodo {self.id} ({self.ip}:{self.port})"
+            return f"Archivo '{filename}' encontrado en nodo propio. {self.id} ({self.ip}:{self.port})"
         else:
-            return f"Archivo '{filename}' no encontrado en nodo {self.id}"
+            return f"Archivo '{filename}' no encontrado en nodo propio. {self.id}"
 
     def display_info(self) -> None:
         #muestra información del nodo: id, ip, puerto, sucesor, predecesor y archivos almacenados
@@ -173,7 +190,6 @@ def find_successor():
         print(f"Error en /find_successor: {str(e)}")
         return jsonify({'error': f"Internal server error: {str(e)}"}), 500
 
-
 @app.route('/notify', methods=['POST'])
 def notify():
     #maneja las notificaciones sobre nuevos nodos en la red a través de REST
@@ -189,6 +205,21 @@ def get_predecessor():
     if node.predecessor:
         return jsonify(node.predecessor)
     return jsonify({'message': 'No predecessor found'}), 404
+
+@app.route('/search', methods=['POST'])
+def search():
+    try:
+        data = request.json
+        if 'filename' not in data:
+            return jsonify({'error': 'Missing filename'}), 400
+
+        result = node.search(data['filename'])
+        if 'error' in result:
+            return jsonify(result), 500
+        return jsonify(result)
+    except Exception as e:
+        print(f"Error en /search: {str(e)}")
+        return jsonify({'error': f"Internal server error: {str(e)}"}), 500
 
 @app.route('/ping', methods=['GET'])
 def ping():
@@ -250,6 +281,13 @@ def main() -> None:
         elif command.startswith("lookup"):
             _, filename = command.split()
             print(node.lookup_file(filename))
+        elif command.startswith("search"):
+            _, filename = command.split()
+            response = node.search(filename)
+            if 'error' in response:
+                print(response['error'])
+            else:
+                print(f"Archivo '{filename}' está en {response['url']}")
         elif command == "info":
             node.display_info()
         else:
