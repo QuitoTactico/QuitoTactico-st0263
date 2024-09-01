@@ -32,8 +32,13 @@ class Node:
             #si no, preguntamos al nodo más cercano de nuestra finger table
             closest_preceding_node = self.closest_preceding_finger(node_id)
             url = f"http://{closest_preceding_node['ip']}:{closest_preceding_node['port']}/find_successor"
-            response = requests.post(url, json={'id': node_id})
-            return response.json()
+            try:
+                response = requests.post(url, json={'id': node_id})
+                response.raise_for_status()
+                return response.json()
+            except requests.exceptions.RequestException as e:
+                print(f"Error al contactar al nodo más cercano: {e}")
+                return {'error': 'Failed to find successor'}
 
     def closest_preceding_finger(self, node_id: int) -> dict:
         #buscamos el nodo más cercano que precede al id que estamos buscando
@@ -134,21 +139,30 @@ class Node:
 def find_successor():
     #maneja la solicitud para encontrar el sucesor a través de REST
     data = request.json
+    if 'id' not in data:
+        return jsonify({'error': 'Missing id'}), 400
+    
     node_id = data['id']
     result = node.find_successor(node_id)
+    if 'error' in result:
+        return jsonify(result), 500
     return jsonify(result)
 
 @app.route('/notify', methods=['POST'])
 def notify():
     #maneja las notificaciones sobre nuevos nodos en la red a través de REST
     data = request.json
+    if not data or 'id' not in data:
+        return jsonify({'error': 'Invalid request'}), 400
     node.notify(data)
     return jsonify({'message': 'Predecessor updated'})
 
 @app.route('/get_predecessor', methods=['GET'])
 def get_predecessor():
     #devuelve el predecesor del nodo actual
-    return jsonify(node.predecessor)
+    if node.predecessor:
+        return jsonify(node.predecessor)
+    return jsonify({'message': 'No predecessor found'}), 404
 
 @app.route('/ping', methods=['GET'])
 def ping():
