@@ -2,6 +2,6 @@
     "own_ip": "127.0.0.1",
     "own_port": 5000,
     "update_interval": 5,
-    "bootstrap_ip": "",
-    "bootstrap_port": ""
+    "bootstrap_ip": "44.203.196.212",
+    "bootstrap_port": 5000
 }

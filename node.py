@@ -74,9 +74,11 @@ class Node:
             time.sleep(self.update_interval)  #esperamos el intervalo de actualización
 
     def notify(self, new_predecessor: dict) -> None:
-        #actualiza el predecesor si el nuevo predecesor es más cercano que el actual
-        if not self.predecessor or (self.predecessor['id'] < new_predecessor['id'] < self.id):
+        #actualiza el predecesor si no tenemos uno, si somos nuestro propio predecesor, o si el nuevo predecesor es más cercano que el actual
+        if (not self.predecessor) or (self.predecessor['id'] == self.id) or (self.predecessor['id'] < new_predecessor['id'] < self.id):
             self.predecessor = new_predecessor
+            print(f"Predecesor actualizado: {self.predecessor['id']} ({self.predecessor['ip']}:{self.predecessor['port']})")
+
 
     def fix_fingers(self):
         #ciclo que repara la finger table periódicamente
