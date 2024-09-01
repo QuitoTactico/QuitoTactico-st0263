@@ -7,13 +7,13 @@ cd QuitoTactico-st0263
 pip3 install -r requirements.txt
 
 - PARA INICIAR EL PRIMER NODO:
-sudo nano config.json
+sudo nano bootstrap.json
 (Agregar la IP propia en "own_ip" y el puerto en "own_port")
 (Dejar en blanco "bootstrap_ip" y "bootstrap_port", ya sea no definiéndolos o dejándolos como "")
 python3 node.py
 
 - PARA INICIAR LOS NODOS SIGUIENTES:
-sudo nano config.json
+sudo nano bootstrap.json
 (Agregar la IP propia en "own_ip" y el puerto en "own_port")
 (Agregar la IP a la que se conectará en "bootsrap_ip" y el puerto en "bootstrap_port")
 python3 node.py

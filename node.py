@@ -12,7 +12,7 @@ from grpc_service import serve_grpc
 app = Flask(__name__)
 
 class Node:
-    def __init__(self, ip: str, port: int, id: int, update_interval: int, m: int = 16) -> None:
+    def __init__(self, ip: str, port: int, id: int, update_interval: int) -> None:
         self.ip = ip  #ip del nodo donde estará escuchando
         self.port = port  #puerto del nodo donde estará escuchando
         self.id = id  #id del nodo calculado con hash
@@ -20,111 +20,95 @@ class Node:
         self.successor = {}  #sucesor inicial como un diccionario vacío
         self.predecessor = {}  #predecesor inicial como un diccionario vacío
         self.files = {}  #diccionario para almacenar archivos
-        self.m = m  #número de bits en el espacio de identificadores
-        self.finger_table = [None] * self.m  #inicializamos la finger table
 
-    def find_successor(self, node_id: int) -> dict:
-        #si el id está entre el nodo actual y su sucesor, entonces el sucesor es el nodo que buscamos
-        if self.successor and (self.id < node_id <= self.successor['id'] or
-                               (self.successor['id'] < self.id and 
-                                (node_id > self.id or node_id <= self.successor['id']))):
+    def find_successor(self, id_to_find: int) -> dict:
+        #si el id buscado está entre el nodo actual y su sucesor, retornamos el sucesor
+        if self.is_in_interval(id_to_find, self.id, self.successor['id']):
             return self.successor
-        elif self.id == node_id:
-            #si el nodo actual es su propio sucesor (caso típico para el primer nodo)
-            return self.to_dict()
         else:
-            #si no, buscamos el nodo más cercano en la finger table
-            closest_preceding_node = self.closest_preceding_finger(node_id)
-            if closest_preceding_node['id'] == self.id:
-                #si el nodo más cercano es el propio nodo, evitamos hacer la llamada a sí mismo
-                return self.to_dict()
-            url = f"http://{closest_preceding_node['ip']}:{closest_preceding_node['port']}/find_successor"
-            try:
-                response = requests.post(url, json={'id': node_id})
-                response.raise_for_status()
-                return response.json()
-            except requests.exceptions.RequestException as e:
-                print(f"Error al contactar al nodo más cercano: {e}")
-                return {'error': 'Failed to find successor'}
+            #iniciamos desde el sucesor actual
+            next_node = self.successor
+            while True:
+                #consultamos al siguiente nodo por su sucesor
+                url = f"http://{next_node['ip']}:{next_node['port']}/get_successor"
+                try:
+                    response = requests.get(url)
+                    response.raise_for_status()
+                    next_successor = response.json()
+                    
+                    #verificamos si el id buscado está entre el nodo actual y su sucesor
+                    if self.is_in_interval(id_to_find, next_node['id'], next_successor['id']):
+                        return next_successor
+                    else:
+                        next_node = next_successor
+                except requests.exceptions.RequestException as e:
+                    print(f"Error al contactar al nodo {next_node['id']}: {e}")
+                    return {}
+    
+    def is_in_interval(self, id_to_check: int, start: int, end: int) -> bool:
+        #verifica si id_to_check está en el intervalo (start, end]
+        if start < end:
+            return start < id_to_check <= end
+        else:
+            return start < id_to_check or id_to_check <= end
 
     def search(self, filename: str) -> dict:
         #calculamos el id del archivo basado en su nombre
         file_id = hash_key(filename)
-
-        #buscamos el nodo responsable de almacenar el archivo usando la finger table
+        
+        #buscamos el nodo responsable del archivo
         responsible_node = self.find_successor(file_id)
         
-        #si el nodo responsable es el actual, verificamos si el archivo está presente
+        if not responsible_node:
+            return {'error': 'No se pudo encontrar el nodo responsable'}
+        
+        #verificamos si el nodo responsable tiene el archivo
         if responsible_node['id'] == self.id:
             if filename in self.files:
                 return {'url': f"http://{self.ip}:{self.port}/download/{filename}"}
             else:
-                return {'error': f"Archivo '{filename}' no encontrado en nodo propio ({self.id})"}
-        
-        #si el nodo responsable es otro, retornamos la url para descargar el archivo desde ese nodo
-        return {'url': f"http://{responsible_node['ip']}:{responsible_node['port']}/download/{filename}"}
-
-    def closest_preceding_finger(self, node_id: int) -> dict:
-        #buscamos el nodo más cercano que precede al id que estamos buscando
-        for i in range(self.m - 1, -1, -1):
-            if self.finger_table[i] and 'id' in self.finger_table[i] and self.id < self.finger_table[i]['id'] < node_id:
-                #recorremos la tabla en orden inverso buscando si existe un id
-                #necesitamos verificar que el nodo actual tenga un id menor al id del nodo en la finger table
-                return self.finger_table[i]
-        return self.to_dict()  #si no encontramos uno más cercano, devolvemos el propio nodo
+                return {'error': f"Archivo '{filename}' no encontrado en nodo actual ({self.id})"}
+        else:
+            return {'url': f"http://{responsible_node['ip']}:{responsible_node['port']}/download/{filename}"}
 
     def stabilize(self):
         #estabiliza el nodo verificando su sucesor y predecesor
         while True:
-            if self.successor:
+            try:
                 #preguntamos al sucesor por su predecesor
                 url = f"http://{self.successor['ip']}:{self.successor['port']}/get_predecessor"
                 response = requests.get(url)
+                response.raise_for_status()
                 successor_predecessor = response.json()
-
-                #si el predecesor del sucesor debería ser nuestro nuevo sucesor, lo actualizamos
-                if successor_predecessor and self.id < successor_predecessor['id'] < self.successor['id']:
+                
+                #verificamos si el predecesor del sucesor está entre el nodo actual y su sucesor
+                if successor_predecessor and self.is_in_interval(successor_predecessor['id'], self.id, self.successor['id']):
                     self.successor = successor_predecessor
 
-                #notificamos al sucesor que somos su predecesor
-                url = f"http://{self.successor['ip']}:{self.successor['port']}/notify"
-                requests.post(url, json=self.to_dict())
-
-            time.sleep(self.update_interval)  #esperamos el intervalo de actualización
-
-    def notify(self, new_predecessor: dict) -> None:
-        #actualiza el predecesor si no tenemos uno, si somos nuestro propio predecesor, o si el nuevo predecesor es más cercano que el actual
-        if (not self.predecessor) or (self.predecessor['id'] == self.id) or (self.predecessor['id'] < new_predecessor['id'] < self.id):
-            self.predecessor = new_predecessor
-            print(f"Predecesor actualizado: {self.predecessor['id']} ({self.predecessor['ip']}:{self.predecessor['port']})")
-        
-        #si el sucesor es el propio nodo, lo actualizamos al nuevo predecesor
-        if self.successor.get('id') is None or self.successor['id'] == self.id:
-            self.successor = new_predecessor
-            print(f"Sucesor actualizado: {self.successor['id']} ({self.successor['ip']}:{self.successor['port']})")
-
-    def fix_fingers(self):
-        #ciclo que repara la finger table periódicamente
-        while True:
-            for i in range(self.m):
-                finger_id = (self.id + 2 ** i) % (2 ** self.m)
-                #find_sucessor siempre debería retornar un diccionario válido
-                successor = self.find_successor(finger_id)
-                if successor and 'id' in successor:
-                    self.finger_table[i] = successor
-                else:
-                    print(f"Error al encontrar sucesor para finger {i} con id {finger_id}")
+                #notificamos al sucesor que este nodo es su predecesor
+                notify_url = f"http://{self.successor['ip']}:{self.successor['port']}/notify"
+                requests.post(notify_url, json=self.to_dict())
+            except requests.exceptions.RequestException as e:
+                print(f"Error durante estabilización: {e}")
             time.sleep(self.update_interval)
 
+    def notify(self, new_predecessor: dict) -> None:
+        #actualiza el predecesor si es nulo o si el nuevo es más adecuado
+        if not self.predecessor or self.is_in_interval(new_predecessor['id'], self.predecessor['id'], self.id):
+            self.predecessor = new_predecessor
+            print(f"Predecesor actualizado: {self.predecessor['id']} ({self.predecessor['ip']}:{self.predecessor['port']})")
+
     def check_predecessor(self):
-        #verifica si el predecesor está activo
+        #verifica periódicamente si el predecesor está activo
         while True:
             if self.predecessor:
                 try:
                     url = f"http://{self.predecessor['ip']}:{self.predecessor['port']}/ping"
-                    requests.get(url)
-                except:
-                    self.predecessor = None  #si falla el ping, eliminamos el predecesor
+                    response = requests.get(url)
+                    response.raise_for_status()
+                except requests.exceptions.RequestException:
+                    print(f"Predecesor {self.predecessor['id']} no responde. Eliminando predecesor.")
+                    self.predecessor = {}
             time.sleep(self.update_interval)
 
     def to_dict(self) -> dict:
@@ -133,36 +117,30 @@ class Node:
 
     def store_file(self, filename: str) -> str:
         #almacena el archivo en el nodo actual
-        self.files[filename] = f"Transfiriendo {filename}... Archivo transferido"
+        self.files[filename] = f"Contenido de {filename}"
         return f"Archivo '{filename}' almacenado en el nodo {self.id}"
 
     def lookup_file(self, filename: str) -> str:
         #busca el archivo en el nodo actual
         if filename in self.files:
-            return f"Archivo '{filename}' encontrado en nodo propio ({self.id}) ({self.ip}:{self.port})"
+            return f"Archivo '{filename}' encontrado en nodo actual ({self.id})"
         else:
-            return f"Archivo '{filename}' no encontrado en nodo propio ({self.id})"
+            return f"Archivo '{filename}' no encontrado en nodo actual ({self.id})"
 
     def display_info(self) -> None:
         #muestra información del nodo: id, ip, puerto, sucesor, predecesor y archivos almacenados
         print("\n=== Información del Nodo ===")
-        print(f"id: {self.id} (IP: {self.ip}, Puerto: {self.port})\n")
+        print(f"id: {self.id} (ip: {self.ip}, puerto: {self.port})\n")
         print("Sucesor:")
         if self.successor:
-            print(f"  id: {self.successor['id']}, IP: {self.successor['ip']}, Puerto: {self.successor['port']}\n")
+            print(f"  id: {self.successor['id']}, ip: {self.successor['ip']}, puerto: {self.successor['port']}\n")
         else:
             print("  Ninguno\n")
         print("Predecesor:")
         if self.predecessor:
-            print(f"  id: {self.predecessor['id']}, IP: {self.predecessor['ip']}, Puerto: {self.predecessor['port']}\n")
+            print(f"  id: {self.predecessor['id']}, ip: {self.predecessor['ip']}, puerto: {self.predecessor['port']}\n")
         else:
             print("  Ninguno\n")
-        print("Finger Table:")
-        for i, finger in enumerate(self.finger_table):
-            if finger:
-                print(f"  {i}: id={finger['id']}, IP={finger['ip']}, Puerto={finger['port']}")
-            else:
-                print(f"  {i}: None")
         print("Archivos almacenados:")
         if self.files:
             for filename in self.files:
@@ -171,11 +149,10 @@ class Node:
             print("  No hay archivos almacenados")
         print("===========================\n")
 
-
 #---------------------------------------------- REST API ----------------------------------------------
 
 @app.route('/find_successor', methods=['POST'])
-def find_successor():
+def find_successor_route():
     try:
         data = request.json
         if 'id' not in data:
@@ -183,28 +160,35 @@ def find_successor():
         
         node_id = data['id']
         result = node.find_successor(node_id)
-        if 'error' in result:
-            return jsonify(result), 500
+        if not result:
+            return jsonify({'error': 'No se pudo encontrar el sucesor'}), 500
         return jsonify(result)
     except Exception as e:
         print(f"Error en /find_successor: {str(e)}")
         return jsonify({'error': f"Internal server error: {str(e)}"}), 500
-
-@app.route('/notify', methods=['POST'])
-def notify():
-    #maneja las notificaciones sobre nuevos nodos en la red a través de REST
-    data = request.json
-    if not data or 'id' not in data:
-        return jsonify({'error': 'Invalid request'}), 400
-    node.notify(data)
-    return jsonify({'message': 'Predecessor updated'})
 
 @app.route('/get_predecessor', methods=['GET'])
 def get_predecessor():
     #devuelve el predecesor del nodo actual
     if node.predecessor:
         return jsonify(node.predecessor)
-    return jsonify({'message': 'No predecessor found'}), 404
+    return jsonify({}), 404
+
+@app.route('/get_successor', methods=['GET'])
+def get_successor():
+    #devuelve el sucesor del nodo actual
+    if node.successor:
+        return jsonify(node.successor)
+    return jsonify({}), 404
+
+@app.route('/notify', methods=['POST'])
+def notify():
+    #maneja las notificaciones sobre nuevos predecesores
+    data = request.json
+    if not data or 'id' not in data:
+        return jsonify({'error': 'Invalid request'}), 400
+    node.notify(data)
+    return jsonify({'message': 'Predecesor actualizado'})
 
 @app.route('/search', methods=['POST'])
 def search():
@@ -214,8 +198,6 @@ def search():
             return jsonify({'error': 'Missing filename'}), 400
 
         result = node.search(data['filename'])
-        if 'error' in result:
-            return jsonify(result), 500
         return jsonify(result)
     except Exception as e:
         print(f"Error en /search: {str(e)}")
@@ -242,34 +224,31 @@ def main() -> None:
     node_id = hash_key(f'{ip}:{port}')
     global node
     node = Node(ip, port, node_id, update_interval)
-
+    
     bootstrap_ip = config.get("bootstrap_ip")
     bootstrap_port = config.get("bootstrap_port")
-
-    #si el nodo no es el primero, se conecta al nodo bootstrap
-    if bootstrap_ip and bootstrap_port:
-        if bootstrap_ip != "" and bootstrap_port != "":
+    
+    if bootstrap_ip and bootstrap_port and bootstrap_ip != "" and bootstrap_port != "":
+        try:
+            #contactamos al nodo bootstrap para encontrar nuestro sucesor
             url = f"http://{bootstrap_ip}:{bootstrap_port}/find_successor"
             response = requests.post(url, json={'id': node.id})
+            response.raise_for_status()
             node.successor = response.json()
+            print(f"Sucesor inicial establecido: {node.successor['id']} ({node.successor['ip']}:{node.successor['port']})")
+        except requests.exceptions.RequestException as e:
+            print(f"Error al conectarse al nodo bootstrap: {e}")
+            node.successor = node.to_dict()
+    else:
+        #si no hay nodo bootstrap, nos establecemos como nuestro propio sucesor y predecesor
+        node.successor = node.to_dict()
+        node.predecessor = node.to_dict()
+        print("Nodo inicial de la red creado.")
 
-            #notificamos al sucesor sobre la existencia de este nodo
-            notify_url = f"http://{node.successor['ip']}:{node.successor['port']}/notify"
-            requests.post(notify_url, json=node.to_dict())
-
-            #si no tenemos predecesor, lo configuramos como el nodo bootstrap
-            if not node.predecessor:
-                node.predecessor = {
-                    'ip': bootstrap_ip,
-                    'port': bootstrap_port,
-                    'id': hash_key(f'{bootstrap_ip}:{bootstrap_port}')
-                }
-
-    #inicia los servidores REST y gRPC, y el proceso de estabilización
+    #iniciamos los servidores y procesos de estabilización
     threading.Thread(target=serve_rest).start()
     threading.Thread(target=serve_grpc, args=(node,)).start()
     threading.Thread(target=node.stabilize).start()
-    threading.Thread(target=node.fix_fingers).start()
     threading.Thread(target=node.check_predecessor).start()
 
     #loop principal para manejar comandos desde la consola
@@ -295,7 +274,7 @@ def main() -> None:
 
 def hash_key(key: str) -> int:
     #genera un id único basado en el hash SHA-1 de la clave
-    return int(hashlib.sha1(key.encode()).hexdigest(), 16) % 2**16
+    return int(hashlib.sha1(key.encode()).hexdigest(), 16) % (2**16)
 
 if __name__ == '__main__':
     main()
