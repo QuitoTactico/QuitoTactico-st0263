@@ -19,25 +19,25 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
 - Simulación de transferencia de archivos mediante gRPC.
 - Configuración flexible a través de un archivo `bootstrap.json` que permite especificar IPs y puertos de forma dinámica.
 - Implementación de lógica de estabilización para mantener la red Chord actualizada.
+- Implementación completa de la finger table para mejorar la eficiencia en la búsqueda de sucesores.
 - Verificación periódica de la disponibilidad del predecesor para asegurar la consistencia de la red.
 - Interfaz de comandos para almacenar, buscar archivos y obtener información del nodo.
 - El sistema se puede desplegar en instancias EC2 de AWS.
 
 ### 1.2. Aspectos NO cumplidos o desarrollados de la actividad propuesta por el profesor (requerimientos funcionales y no funcionales):
-
 - El sistema simula la transferencia de archivos, pero no realiza transferencias reales de datos binarios.
-- No se implementó la tabla de fingers para mejorar la eficiencia en la búsqueda de sucesores, simplificando así el modelo a O(N).
 - No se implementó la solución usando un Message Oriented Middleware (MOM) por la razón:
-    - Facilidad de implementación: se optó por un modelo de peticiones API REST que procesa las solicitudes directamente, evitando la complejidad adicional de un middleware.
-  
+    - Facilidad de implementación: añadir un middleware que procese las solicitudes temporalmente, y se las envíe a los o el nodo respectivo, a veces puede ser complicado, por lo que para esta solución optamos por un modelo de peticiones API REST que procese las solicitudes directamente
+- Se pensaron en los beneficios que recurría implementar mom, tales como: reducir la interdependencia de nodos, ya que si uno se tardaba en su solicitud, los demás tenían este mismo comportamiento, o también que tener un middleware pued llevar a que la solución sea más escalable aumentando la cantidad de nodos sin comprometer la integridad de uno respecto al otro a la hora de procesar la solicitud o enviarla.
 ---
 
 ## 2. Información general de diseño de alto nivel, arquitectura, patrones, mejores prácticas utilizadas:
 
-- **Arquitectura P2P basada en Chord (simplificada):** La red se organiza en un anillo, lo que permite la búsqueda de archivos utilizando sucesores y predecesores.
+- **Arquitectura P2P basada en Chord:** La red se organiza en un anillo, lo que permite la búsqueda eficiente de archivos utilizando una tabla de rutas (finger table).
 - **REST API para comunicación:** Flask se utiliza para manejar las operaciones de red, proporcionando flexibilidad y facilidad de depuración.
 - **gRPC para transferencia de archivos:** gRPC se utiliza para la simulación de la transferencia de archivos, aprovechando su eficiencia en la transmisión de datos binarios.
 - **Configuración dinámica:** La configuración del sistema (IP, puerto, nodo de arranque) se realiza a través de un archivo `bootstrap.json`.
+- **Finger Table:** Implementación completa de la finger table para mejorar la eficiencia en la búsqueda de sucesores en la red.
 - **Estabilización Automática:** El sistema cuenta con mecanismos para la estabilización automática de la red, verificando y corrigiendo los sucesores y predecesores de cada nodo.
 
 ---
@@ -150,12 +150,7 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
   > lookup tarea.txt
   ```
 
-- **Para buscar un archivo en la red (desde la consola):**
-  ```bash
-  > search tarea.txt
-  ```
-
-- **Para ver la información del nodo (sucesor, predecesor, archivos):**
+- **Para ver la información del nodo (finger table, sucesor, predecesor, archivos):**
   ```bash
   > info
   ```
@@ -174,4 +169,10 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
 - **gRPC Official Documentation:** [https://grpc.io/docs/](https://grpc.io/docs/)
 - **Chord: A Scalable Peer-to-peer Lookup Service for Internet Applications** [Chord Paper](https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf)
 - **Flask Documentation:** [https://flask.palletsprojects.com/en/2.0.x/](https://flask.palletsprojects.com/en/2.0.x/)
+- **AWS EC2 Documentation:** [https://docs.aws.amazon.com/ec2/](https://docs.aws.amazon.com/ec2/)
+
+## Referencias:
+
+- **gRPC Official Documentation:** [https://grpc.io/docs/](https://grpc.io/docs/)
+- **Chord: A Scalable Peer-to-peer Lookup Service for Internet Applications** [Chord Paper](https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf)
 - **AWS EC2 Documentation:** [https://docs.aws.amazon.com/ec2/](https://docs.aws.amazon.com/ec2/)
