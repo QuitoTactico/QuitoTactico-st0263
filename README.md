@@ -25,10 +25,7 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
 - El sistema se puede desplegar en instancias EC2 de AWS.
 
 ### 1.2. Aspectos NO cumplidos o desarrollados de la actividad propuesta por el profesor (requerimientos funcionales y no funcionales):
-
-- No se implementó el uso de Message-Oriented Middleware (MOM).
 - El sistema simula la transferencia de archivos, pero no realiza transferencias reales de datos binarios.
-
 ---
 
 ## 2. Información general de diseño de alto nivel, arquitectura, patrones, mejores prácticas utilizadas:
