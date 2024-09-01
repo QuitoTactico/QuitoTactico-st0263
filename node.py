@@ -12,7 +12,7 @@ from grpc_service import serve_grpc
 app = Flask(__name__)
 
 class Node:
-    def __init__(self, ip: str, port: int, id: int, update_interval: int) -> None:
+    def __init__(self, ip: str, port: int, id: int, update_interval: int, config: dict) -> None:
         self.ip = ip  #ip del nodo donde estará escuchando
         self.port = port  #puerto del nodo donde estará escuchando
         self.id = id  #id del nodo calculado con hash
@@ -20,6 +20,29 @@ class Node:
         self.successor = {}  #sucesor inicial como un diccionario vacío
         self.predecessor = {}  #predecesor inicial como un diccionario vacío
         self.files = {}  #diccionario para almacenar archivos
+        self.config = config #configuración del nodo, bootstrap
+
+    def bootstrap(self):
+        bootstrap_ip = self.config.get("bootstrap_ip")
+        bootstrap_port = self.config.get("bootstrap_port")
+        
+        if bootstrap_ip and bootstrap_port and bootstrap_ip != "" and bootstrap_port != "":
+            try:
+                #contactamos al nodo bootstrap para encontrar nuestro sucesor
+                url = f"http://{bootstrap_ip}:{bootstrap_port}/find_successor"
+                response = requests.post(url, json={'id': self.id})
+                response.raise_for_status()
+                self.successor = response.json()
+                print(f"Sucesor inicial establecido: {self.successor['id']} ({self.successor['ip']}:{self.successor['port']})")
+            except requests.exceptions.RequestException as e:
+                print(f"Error al conectarse al nodo bootstrap: {e}")
+                self.successor = self.to_dict()
+        else:
+            #si no hay nodo bootstrap, nos establecemos como nuestro propio sucesor y predecesor
+            self.successor = self.to_dict()
+            self.predecessor = self.to_dict()
+            print("Nodo inicial de la red creado.")
+
 
     def is_in_interval(self, id_to_check: int, start: int, end: int) -> bool:
         #verifica si id_to_check está en el intervalo (start, end]
@@ -73,6 +96,7 @@ class Node:
 
     def stabilize(self):
         #estabiliza el nodo verificando su sucesor y predecesor
+        tries = 0
         while True:
             try:
                 #preguntamos al sucesor por su predecesor
@@ -94,9 +118,21 @@ class Node:
                 if not self.predecessor or self.is_in_interval(self.id, self.predecessor['id'], self.successor['id']):
                     notify_url = f"http://{self.successor['ip']}:{self.successor['port']}/notify"
                     requests.post(notify_url, json=self.to_dict())
-            except requests.exceptions.RequestException as e:
+                
+                tries = 0
+            except:
                 print(f"Error durante estabilización")
                 #print(f"Error durante estabilización {e}") #para debug
+                tries += 1
+                if tries >= 3:
+                    print("Demasiados errores de estabilización, ", end="")
+                    if self.predecessor:
+                        print("poniendo a predecesor como sucesor")
+                        self.successor = self.predecessor
+                    else:
+                        print("comenzando con bootstrap")
+                        self.bootstrap()
+
             time.sleep(self.update_interval)
 
     def notify(self, new_predecessor: dict) -> None:
@@ -230,27 +266,9 @@ def main() -> None:
     
     node_id = hash_key(f'{ip}:{port}')
     global node
-    node = Node(ip, port, node_id, update_interval)
+    node = Node(ip, port, node_id, update_interval, config)
     
-    bootstrap_ip = config.get("bootstrap_ip")
-    bootstrap_port = config.get("bootstrap_port")
-    
-    if bootstrap_ip and bootstrap_port and bootstrap_ip != "" and bootstrap_port != "":
-        try:
-            #contactamos al nodo bootstrap para encontrar nuestro sucesor
-            url = f"http://{bootstrap_ip}:{bootstrap_port}/find_successor"
-            response = requests.post(url, json={'id': node.id})
-            response.raise_for_status()
-            node.successor = response.json()
-            print(f"Sucesor inicial establecido: {node.successor['id']} ({node.successor['ip']}:{node.successor['port']})")
-        except requests.exceptions.RequestException as e:
-            print(f"Error al conectarse al nodo bootstrap: {e}")
-            node.successor = node.to_dict()
-    else:
-        #si no hay nodo bootstrap, nos establecemos como nuestro propio sucesor y predecesor
-        node.successor = node.to_dict()
-        node.predecessor = node.to_dict()
-        print("Nodo inicial de la red creado.")
+    node.bootstrap()
 
     #iniciamos los servidores y procesos de estabilización
     threading.Thread(target=serve_rest).start()
