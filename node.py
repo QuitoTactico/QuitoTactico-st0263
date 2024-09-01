@@ -78,6 +78,11 @@ class Node:
         if (not self.predecessor) or (self.predecessor['id'] == self.id) or (self.predecessor['id'] < new_predecessor['id'] < self.id):
             self.predecessor = new_predecessor
             print(f"Predecesor actualizado: {self.predecessor['id']} ({self.predecessor['ip']}:{self.predecessor['port']})")
+        
+        #si el sucesor es el propio nodo, lo actualizamos al nuevo predecesor
+        if self.successor['id'] == self.id:
+            self.successor = new_predecessor
+            print(f"Sucesor actualizado: {self.successor['id']} ({self.successor['ip']}:{self.successor['port']})")
 
 
     def fix_fingers(self):
@@ -212,13 +217,18 @@ def main() -> None:
             url = f"http://{bootstrap_ip}:{bootstrap_port}/find_successor"
             response = requests.post(url, json={'id': node.id})
             node.successor = response.json()
-            if node.successor['id'] == node.id:
-                #si el nodo se asignó a sí mismo como sucesor (primer nodo en la red)
-                node.predecessor = node.to_dict()
-    else:
-        #si este es el primer nodo, se establece como su propio sucesor y predecesor
-        node.successor = node.to_dict()
-        node.predecessor = node.to_dict()
+
+            #notificamos al sucesor sobre la existencia de este nodo
+            notify_url = f"http://{node.successor['ip']}:{node.successor['port']}/notify"
+            requests.post(notify_url, json=node.to_dict())
+
+            #si no tenemos predecesor, lo configuramos como el nodo bootstrap
+            if not node.predecessor:
+                node.predecessor = {
+                    'ip': bootstrap_ip,
+                    'port': bootstrap_port,
+                    'id': hash_key(f'{bootstrap_ip}:{bootstrap_port}')
+                }
 
     #inicia los servidores REST y gRPC, y el proceso de estabilización
     threading.Thread(target=serve_rest).start()
@@ -240,6 +250,7 @@ def main() -> None:
             node.display_info()
         else:
             print("Comando no reconocido")
+
 
 def hash_key(key: str) -> int:
     #genera un id único basado en el hash SHA-1 de la clave
