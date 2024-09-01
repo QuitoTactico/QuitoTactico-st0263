@@ -21,6 +21,13 @@ class Node:
         self.predecessor = {}  #predecesor inicial como un diccionario vacío
         self.files = {}  #diccionario para almacenar archivos
 
+    def is_in_interval(self, id_to_check: int, start: int, end: int) -> bool:
+        #verifica si id_to_check está en el intervalo (start, end]
+        if start < end:
+            return start < id_to_check <= end
+        else:
+            return start < id_to_check or id_to_check <= end
+
     def find_successor(self, id_to_find: int) -> dict:
         #si el id buscado está entre el nodo actual y su sucesor, retornamos el sucesor
         if self.is_in_interval(id_to_find, self.id, self.successor['id']):
@@ -35,7 +42,7 @@ class Node:
                     response = requests.get(url)
                     response.raise_for_status()
                     next_successor = response.json()
-                    
+
                     #verificamos si el id buscado está entre el nodo actual y su sucesor
                     if self.is_in_interval(id_to_find, next_node['id'], next_successor['id']):
                         return next_successor
@@ -44,13 +51,6 @@ class Node:
                 except requests.exceptions.RequestException as e:
                     print(f"Error al contactar al nodo {next_node['id']}: {e}")
                     return {}
-    
-    def is_in_interval(self, id_to_check: int, start: int, end: int) -> bool:
-        #verifica si id_to_check está en el intervalo (start, end]
-        if start < end:
-            return start < id_to_check <= end
-        else:
-            return start < id_to_check or id_to_check <= end
 
     def search(self, filename: str) -> dict:
         #calculamos el id del archivo basado en su nombre
@@ -82,15 +82,21 @@ class Node:
                 successor_predecessor = response.json()
                 
                 #verificamos si el predecesor del sucesor está entre el nodo actual y su sucesor
-                if successor_predecessor and self.is_in_interval(successor_predecessor['id'], self.id, self.successor['id']):
-                    self.successor = successor_predecessor
+                if successor_predecessor:
+                    if self.is_in_interval(successor_predecessor['id'], self.id, self.successor['id']):
+                        self.successor = successor_predecessor
+                else:
+                    #si el sucesor no tiene predecesor, este nodo debe ser su predecesor
+                    notify_url = f"http://{self.successor['ip']}:{self.successor['port']}/notify"
+                    requests.post(notify_url, json=self.to_dict())
 
-                #notificamos al sucesor que este nodo es su predecesor
-                notify_url = f"http://{self.successor['ip']}:{self.successor['port']}/notify"
-                requests.post(notify_url, json=self.to_dict())
+                #notificamos al sucesor que este nodo es su predecesor si es necesario
+                if not self.predecessor or self.is_in_interval(self.id, self.predecessor['id'], self.successor['id']):
+                    notify_url = f"http://{self.successor['ip']}:{self.successor['port']}/notify"
+                    requests.post(notify_url, json=self.to_dict())
             except requests.exceptions.RequestException as e:
-                #print(f"Error durante estabilización: {e}") #para debug ampliado
                 print(f"Error durante estabilización")
+                #print(f"Error durante estabilización {e}") #para debug
             time.sleep(self.update_interval)
 
     def notify(self, new_predecessor: dict) -> None:
