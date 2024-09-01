@@ -26,11 +26,17 @@ class Node:
     def find_successor(self, node_id: int) -> dict:
         #si el id está entre el nodo actual y su sucesor, entonces el sucesor es el nodo que buscamos
         if self.successor and (self.id < node_id <= self.successor['id'] or
-                               (self.successor['id'] < self.id and (node_id > self.id or node_id <= self.successor['id']))):
+                            (self.successor['id'] < self.id and (node_id > self.id or node_id <= self.successor['id']))):
             return self.successor
+        elif self.id == node_id:
+            #si el nodo actual es su propio sucesor (solo en red o el primer nodo)
+            return self.to_dict()
         else:
             #si no, preguntamos al nodo más cercano de nuestra finger table
             closest_preceding_node = self.closest_preceding_finger(node_id)
+            if closest_preceding_node['id'] == self.id:
+                #si el nodo más cercano es el propio nodo, evitamos hacer la llamada a sí mismo
+                return self.to_dict()
             url = f"http://{closest_preceding_node['ip']}:{closest_preceding_node['port']}/find_successor"
             try:
                 response = requests.post(url, json={'id': node_id})
@@ -40,12 +46,13 @@ class Node:
                 print(f"Error al contactar al nodo más cercano: {e}")
                 return {'error': 'Failed to find successor'}
 
+
     def closest_preceding_finger(self, node_id: int) -> dict:
-        # buscamos el nodo más cercano que precede al id que estamos buscando
+        #buscamos el nodo más cercano que precede al id que estamos buscando
         for i in range(self.m - 1, -1, -1):
             if self.finger_table[i] and 'id' in self.finger_table[i] and self.id < self.finger_table[i]['id'] < node_id:
                 return self.finger_table[i]
-        return self.to_dict()  # si no encontramos uno más cercano, devolvemos el propio nodo
+        return self.to_dict()  #si no encontramos uno más cercano, devolvemos el propio nodo
 
     def stabilize(self):
         #estabiliza el nodo verificando su sucesor y predecesor
@@ -72,11 +79,11 @@ class Node:
             self.predecessor = new_predecessor
 
     def fix_fingers(self):
-        # ciclo que repara la finger table periódicamente
+        #ciclo que repara la finger table periódicamente
         while True:
             for i in range(self.m):
                 finger_id = (self.id + 2 ** i) % (2 ** self.m)
-                # Asegúrate de que `find_successor` siempre devuelve un diccionario válido
+                #Asegúrate de que `find_successor` siempre devuelve un diccionario válido
                 successor = self.find_successor(finger_id)
                 if successor and 'id' in successor:
                     self.finger_table[i] = successor
@@ -139,28 +146,22 @@ class Node:
             print("  No hay archivos almacenados")
         print("===========================\n")
 
-def find_successor(self, node_id: int) -> dict:
-    #si el id está entre el nodo actual y su sucesor, entonces el sucesor es el nodo que buscamos
-    if self.successor and (self.id < node_id <= self.successor['id'] or
-                           (self.successor['id'] < self.id and (node_id > self.id or node_id <= self.successor['id']))):
-        return self.successor
-    elif self.id == node_id:
-        #si el nodo actual es su propio sucesor (solo en red o el primer nodo)
-        return self.to_dict()
-    else:
-        #si no, preguntamos al nodo más cercano de nuestra finger table
-        closest_preceding_node = self.closest_preceding_finger(node_id)
-        if closest_preceding_node['id'] == self.id:
-            #si el nodo más cercano es el propio nodo, evitamos hacer la llamada a sí mismo
-            return self.to_dict()
-        url = f"http://{closest_preceding_node['ip']}:{closest_preceding_node['port']}/find_successor"
-        try:
-            response = requests.post(url, json={'id': node_id})
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            print(f"Error al contactar al nodo más cercano: {e}")
-            return {'error': 'Failed to find successor'}
+@app.route('/find_successor', methods=['POST'])
+def find_successor():
+    try:
+        data = request.json
+        if 'id' not in data:
+            return jsonify({'error': 'Missing id'}), 400
+        
+        node_id = data['id']
+        result = node.find_successor(node_id)
+        if 'error' in result:
+            return jsonify(result), 500
+        return jsonify(result)
+    except Exception as e:
+        print(f"Error en /find_successor: {str(e)}")
+        return jsonify({'error': f"Internal server error: {str(e)}"}), 500
+
 
 @app.route('/notify', methods=['POST'])
 def notify():
