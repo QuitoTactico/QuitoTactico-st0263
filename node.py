@@ -7,7 +7,7 @@ import chord_pb2 as pb2
 import hashlib
 import time
 import json
-from grpc_service import serve_grpc  #importamos serve_grpc para manejar el servidor gRPC
+from grpc_service import serve_grpc
 
 app = Flask(__name__)
 
@@ -26,7 +26,8 @@ class Node:
     def find_successor(self, node_id: int) -> dict:
         #si el id está entre el nodo actual y su sucesor, entonces el sucesor es el nodo que buscamos
         if self.successor and (self.id < node_id <= self.successor['id'] or
-                            (self.successor['id'] < self.id and (node_id > self.id or node_id <= self.successor['id']))):
+                               (self.successor['id'] < self.id and 
+                                (node_id > self.id or node_id <= self.successor['id']))):
             return self.successor
         elif self.id == node_id:
             #si el nodo actual es su propio sucesor (solo en red o el primer nodo)
@@ -46,12 +47,13 @@ class Node:
                 print(f"Error al contactar al nodo más cercano: {e}")
                 return {'error': 'Failed to find successor'}
 
-
     def closest_preceding_finger(self, node_id: int) -> dict:
         #buscamos el nodo más cercano que precede al id que estamos buscando
         for i in range(self.m - 1, -1, -1):
             if self.finger_table[i] and 'id' in self.finger_table[i] and self.id < self.finger_table[i]['id'] < node_id:
-                return self.finger_table[i] #recorremos la tabla en orden inverso buscando si existe un id, necesitamos verificar que el nodo actual tenga un id menor al id del nodo en la finger table
+                #recorremos la tabla en orden inverso buscando si existe un id
+                #necesitamos verificar que el nodo actual tenga un id menor al id del nodo en la finger table
+                return self.finger_table[i]
         return self.to_dict()  #si no encontramos uno más cercano, devolvemos el propio nodo
 
     def stabilize(self):
@@ -83,7 +85,6 @@ class Node:
         if self.successor['id'] == self.id:
             self.successor = new_predecessor
             print(f"Sucesor actualizado: {self.successor['id']} ({self.successor['ip']}:{self.successor['port']})")
-
 
     def fix_fingers(self):
         #ciclo que repara la finger table periódicamente
@@ -152,6 +153,9 @@ class Node:
         else:
             print("  No hay archivos almacenados")
         print("===========================\n")
+
+
+# ---------------------------------------------- REST API ----------------------------------------------
 
 @app.route('/find_successor', methods=['POST'])
 def find_successor():
@@ -250,7 +254,6 @@ def main() -> None:
             node.display_info()
         else:
             print("Comando no reconocido")
-
 
 def hash_key(key: str) -> int:
     #genera un id único basado en el hash SHA-1 de la clave
