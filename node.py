@@ -366,24 +366,48 @@ def main() -> None:
     while True:
         command = input("> ").strip()
         if command.startswith("store"):
-            _, filename, content = command.split(maxsplit=2)
-            print(node.store_file_grpc(filename, content))
+            try:
+                _, filename, content = command.split(maxsplit=2)
+                print(node.store_file_grpc(filename, content))
+            except:
+                print("comando inválido. uso correcto: store <filename> <content>")
+                continue
         elif command.startswith("lookup"):
-            _, filename = command.split()
-            print(node.lookup_file(filename))
+            try:
+                _, filename = command.split()
+                print(node.lookup_file(filename))
+            except:
+                print("comando inválido. uso correcto: lookup <filename>")
+                continue
         elif command.startswith("search"):
-            _, filename = command.split()
-            response = node.search(filename)
-            if 'error' in response:
-                print(response['error'])
-            else:
-                print(f"archivo '{filename}' está en {response['url']}")
+            try:
+                _, filename = command.split()
+                response = node.search(filename)
+                if 'error' in response:
+                    print(response['error'])
+                else:
+                    print(f"archivo '{filename}' está en {response['url']}")
+            except:
+                print("comando inválido. uso correcto: search <filename>")
+                continue
         elif command.startswith("download"):
-            _, filename = command.split()
-            content = node.download_file_grpc(filename)
-            print(f"contenido descargado: {content}")
+            try:
+                _, filename = command.split()
+                content = node.download_file_grpc(filename)
+                print(f"contenido descargado: {content}")
+            except:
+                print("comando inválido. uso correcto: download <filename>")
+                continue
         elif command == "info":
             node.display_info()
+        elif command == "help":
+            print("comandos disponibles:")
+            print("  store <filename> <content>: almacena un archivo en la red")
+            print("  lookup <filename>: busca un archivo en el nodo actual")
+            print("  search <filename>: busca un archivo en la red")
+            print("  download <filename>: descarga un archivo de la red")
+            print("  info: muestra información del nodo actual")
+            print("  help: muestra esta ayuda")
         else:
             print("comando no reconocido")
 
