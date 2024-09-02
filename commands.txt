@@ -11,6 +11,11 @@ cd QuitoTactico-st0263
 git pull
 sudo nano bootstrap.json
 
+- INICIO RÁPIDO DE MÁQUINA YA MONTADA:
+cd QuitoTactico-st0263
+git pull
+python3 node.py
+
 - PARA INICIAR EL PRIMER NODO:
 cd QuitoTactico-st0263
 git pull

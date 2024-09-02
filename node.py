@@ -9,6 +9,7 @@ import time
 import json
 from concurrent import futures
 from grpc_service import ChordService
+import sys
 
 app = Flask(__name__)
 
@@ -25,6 +26,7 @@ class Node:
         self.config = config  #configuración del nodo, bootstrap
         self.successor_fails = 0  #contador de fallos del sucesor
         self.predecessor_fails = 0  #contador de fallos del predecesor
+        self.threads = []  # lista para mantener los hilos
 
     def bootstrap(self):
         bootstrap_ip = self.config.get("bootstrap_ip")
@@ -37,15 +39,15 @@ class Node:
                 response = requests.post(url, json={'id': self.id})
                 response.raise_for_status()
                 self.successor = response.json()
-                print(f"sucesor inicial establecido: {self.successor['id']} ({self.successor['ip']}:{self.successor['port']})")
+                print(f"Sucesor inicial establecido: {self.successor['id']} ({self.successor['ip']}:{self.successor['port']})")
             except requests.exceptions.RequestException as e:
-                print(f"error al conectarse al nodo bootstrap: {e}")
+                print(f"Error al conectarse al nodo bootstrap: {e}")
                 self.successor = self.to_dict()
         else:
             #si no hay nodo bootstrap, nos establecemos como nuestro propio sucesor y predecesor
             self.successor = self.to_dict()
             self.predecessor = self.to_dict()
-            print("nodo inicial de la red creado.")
+            print("Nodo inicial de la red creado.")
 
     def is_in_interval(self, id_to_check: int, start: int, end: int) -> bool:
         #verifica si id_to_check está en el intervalo (start, end]
@@ -55,30 +57,30 @@ class Node:
             return start < id_to_check or id_to_check <= end
 
     def find_successor(self, id_to_find: int) -> dict:
-        print(f"[find_successor] buscando sucesor para id {id_to_find}, nodo actual: {self.id}, sucesor actual: {self.successor['id']}")
+        print(f"[find_successor] Buscando sucesor para ID {id_to_find}, Nodo Actual: {self.id}, Sucesor Actual: {self.successor['id']}")
         if self.is_in_interval(id_to_find, self.id, self.successor['id']):
-            print(f"[find_successor] sucesor directo encontrado: {self.successor['id']}")
+            print(f"[find_successor] Sucesor directo encontrado: {self.successor['id']}")
             return self.successor
         else:
             next_node = self.successor
             attempts = 0
             while attempts < 10:  #limite de intentos para evitar bucles infinitos
-                print(f"[find_successor] intento {attempts + 1}, consultando nodo {next_node['id']} para id {id_to_find}")
+                print(f"[find_successor] Intento {attempts + 1}, consultando nodo {next_node['id']} para ID {id_to_find}")
                 url = f"http://{next_node['ip']}:{next_node['port']}/get_successor"
                 try:
                     response = requests.get(url)
                     response.raise_for_status()
                     next_successor = response.json()
                     if self.is_in_interval(id_to_find, next_node['id'], next_successor['id']):
-                        print(f"[find_successor] sucesor encontrado: {next_successor['id']} en nodo {next_node['id']}")
+                        print(f"[find_successor] Sucesor encontrado: {next_successor['id']} en nodo {next_node['id']}")
                         return next_successor
                     else:
                         next_node = next_successor
                 except requests.exceptions.RequestException as e:
-                    print(f"[find_successor] error al contactar al nodo {next_node['id']}: {e}")
+                    print(f"[find_successor] Error al contactar al nodo {next_node['id']}: {e}")
                     return {}
                 attempts += 1
-            print(f"[find_successor] exceso de intentos para encontrar sucesor de id {id_to_find}")
+            print(f"[find_successor] Exceso de intentos para encontrar sucesor de ID {id_to_find}")
             return {}
 
     def search(self, filename: str) -> dict:
@@ -89,14 +91,14 @@ class Node:
         responsible_node = self.find_successor(file_id)
         
         if not responsible_node:
-            return {'error': 'no se pudo encontrar el nodo responsable'}
+            return {'error': 'No se pudo encontrar el nodo responsable'}
         
         #verificamos si el nodo responsable tiene el archivo
         if responsible_node['id'] == self.id:
             if filename in self.files:
                 return {'url': f"http://{self.ip}:{self.port}/download/{filename}"}
             else:
-                return {'error': f"archivo '{filename}' no encontrado en nodo actual ({self.id})"}
+                return {'error': f"Archivo '{filename}' no encontrado en nodo actual ({self.id})"}
         else:
             return {'url': f"http://{responsible_node['ip']}:{responsible_node['port']}/download/{filename}"}
 
@@ -126,15 +128,15 @@ class Node:
                 
                 self.successor_fails = 0  #resetea el contador de fallos
             except:
-                print(f"error durante estabilización")
+                print(f"Error durante estabilización")
                 self.successor_fails += 1
                 if self.successor_fails >= 3:
-                    print("demasiados errores de estabilización con sucesor, ", end="")
+                    print("Demasiados errores de estabilización con sucesor, ", end="")
                     if self.predecessor:
-                        print("poniendo a predecesor como sucesor")
+                        print("Poniendo a predecesor como sucesor")
                         self.successor = self.predecessor
                     else:
-                        print("comenzando con bootstrap")
+                        print("Comenzando con bootstrap")
                         self.bootstrap()
 
             time.sleep(self.update_interval)
@@ -143,7 +145,7 @@ class Node:
         #actualiza el predecesor si es nulo o si el nuevo es más adecuado
         if not self.predecessor or self.is_in_interval(new_predecessor['id'], self.predecessor['id'], self.id):
             self.predecessor = new_predecessor
-            print(f"predecesor actualizado: {self.predecessor['id']} ({self.predecessor['ip']}:{self.predecessor['port']})")
+            print(f"Predecesor actualizado: {self.predecessor['id']} ({self.predecessor['ip']}:{self.predecessor['port']})")
 
     def check_predecessor(self):
         #verifica periódicamente si el predecesor está activo
@@ -155,16 +157,16 @@ class Node:
                     response.raise_for_status()
                     self.predecessor_fails = 0  #resetea el contador de fallos
                 except requests.exceptions.RequestException:
-                    print(f"predecesor {self.predecessor['id']} no responde. eliminando predecesor.")
+                    print(f"Predecesor {self.predecessor['id']} no responde. Eliminando predecesor.")
                     self.predecessor = {}
                     self.predecessor_fails += 1
                     if self.predecessor_fails >= 3:
-                        print("demasiados errores con predecesor. ", end="")
+                        print("Demasiados errores con predecesor. ", end="")
                         if self.successor:
-                            print("poniendo a sucesor como predecesor")
+                            print("Poniendo a sucesor como predecesor")
                             self.predecessor = self.successor
                         else:
-                            print("comenzando con bootstrap")
+                            print("Comenzando con bootstrap")
                             self.bootstrap()
             time.sleep(self.update_interval)
 
@@ -188,7 +190,7 @@ class Node:
                     #actualizamos el nodo actual y seguimos
                     current_node = next_node
                 except requests.exceptions.RequestException as e:
-                    print(f"error al contactar al nodo {next_node['id']}: {e}")
+                    print(f"Error al contactar al nodo {next_node['id']}: {e}")
                     return {}
 
     def store_file_grpc(self, filename: str, content: str) -> str:
@@ -198,7 +200,7 @@ class Node:
         responsible_node = self.find_responsible_node(file_id)
 
         if not responsible_node:
-            return "error: no se pudo encontrar el nodo responsable"
+            return "Error: No se pudo encontrar el nodo responsable"
 
         try:
             #conectamos al nodo responsable y enviamos el archivo
@@ -208,8 +210,8 @@ class Node:
                 response = stub.StoreFile(request)
                 return response.message
         except grpc.RpcError as e:
-            print(f"error al almacenar archivo en nodo {responsible_node['id']}: {e}")
-            return "error al almacenar el archivo"
+            print(f"Error al almacenar archivo en nodo {responsible_node['id']}: {e}")
+            return "Error al almacenar el archivo"
 
     def download_file_grpc(self, filename: str) -> str:
         #descarga un archivo del nodo responsable utilizando grpc
@@ -218,7 +220,7 @@ class Node:
         responsible_node = self.find_responsible_node(file_id)
 
         if not responsible_node:
-            return "error: no se pudo encontrar el nodo responsable"
+            return "Error: No se pudo encontrar el nodo responsable"
 
         try:
             #conectamos al nodo responsable y solicitamos el archivo
@@ -228,8 +230,8 @@ class Node:
                 response = stub.DownloadFile(request)
                 return response.content
         except grpc.RpcError as e:
-            print(f"error al descargar archivo de nodo {responsible_node['id']}: {e}")
-            return "error al descargar el archivo"
+            print(f"Error al descargar archivo de nodo {responsible_node['id']}: {e}")
+            return "Error al descargar el archivo"
 
     def serve_grpc(self):
         #inicia el servidor grpc para manejar la transferencia de archivos
@@ -237,7 +239,7 @@ class Node:
         pb2_grpc.add_ChordServiceServicer_to_server(ChordService(self), server)
         server.add_insecure_port(f"[::]:{self.grpc_port}")
         server.start()
-        print(f"servidor grpc escuchando en el puerto {self.grpc_port}")
+        print(f"Servidor gRPC escuchando en el puerto {self.grpc_port}")
         server.wait_for_termination()
 
     def to_dict(self) -> dict:
@@ -246,36 +248,36 @@ class Node:
 
     def store_file(self, filename: str) -> str:
         #almacena el archivo en el nodo actual
-        self.files[filename] = f"contenido de {filename}"
-        return f"archivo '{filename}' almacenado en el nodo {self.id}"
+        self.files[filename] = f"Contenido de {filename}"
+        return f"Archivo '{filename}' almacenado en el nodo {self.id}"
 
     def lookup_file(self, filename: str) -> str:
         #busca el archivo en el nodo actual
         if filename in self.files:
-            return f"archivo '{filename}' encontrado en nodo actual ({self.id})"
+            return f"Archivo '{filename}' encontrado en nodo actual ({self.id})"
         else:
-            return f"archivo '{filename}' no encontrado en nodo actual ({self.id})"
+            return f"Archivo '{filename}' no encontrado en nodo actual ({self.id})"
 
     def display_info(self) -> None:
         #muestra información del nodo: id, ip, puerto, sucesor, predecesor y archivos almacenados
-        print("\n=== información del nodo ===")
-        print(f"id: {self.id} (ip: {self.ip}, puerto: {self.port})\n")
-        print("sucesor:")
+        print("\n=== Información del Nodo ===")
+        print(f"ID: {self.id} (IP: {self.ip}, Puerto: {self.port})\n")
+        print("Sucesor:")
         if self.successor:
-            print(f"  id: {self.successor['id']}, ip: {self.successor['ip']}, puerto: {self.successor['port']}\n")
+            print(f"  ID: {self.successor['id']}, IP: {self.successor['ip']}, Puerto: {self.successor['port']}\n")
         else:
-            print("  ninguno\n")
-        print("predecesor:")
+            print("  Ninguno\n")
+        print("Predecesor:")
         if self.predecessor:
-            print(f"  id: {self.predecessor['id']}, ip: {self.predecessor['ip']}, puerto: {self.predecessor['port']}\n")
+            print(f"  ID: {self.predecessor['id']}, IP: {self.predecessor['ip']}, Puerto: {self.predecessor['port']}\n")
         else:
-            print("  ninguno\n")
-        print("\narchivos almacenados:")
+            print("  Ninguno\n")
+        print("\nArchivos almacenados:")
         if self.files:
             for filename in self.files:
                 print(f"  - {filename}")
         else:
-            print("  no hay archivos almacenados")
+            print("  No hay archivos almacenados")
         print("===========================\n")
 
 #---------------------------------------------- rest api ----------------------------------------------
@@ -285,16 +287,16 @@ def find_successor_route():
     try:
         data = request.json
         if 'id' not in data:
-            return jsonify({'error': 'missing id'}), 400
+            return jsonify({'error': 'Missing ID'}), 400
         
         node_id = data['id']
         result = node.find_successor(node_id)
         if not result:
-            return jsonify({'error': 'no se pudo encontrar el sucesor'}), 500
+            return jsonify({'error': 'No se pudo encontrar el sucesor'}), 500
         return jsonify(result)
     except Exception as e:
-        print(f"error en /find_successor: {str(e)}")
-        return jsonify({'error': f"internal server error: {str(e)}"}), 500
+        print(f"Error en /find_successor: {str(e)}")
+        return jsonify({'error': f"Internal server error: {str(e)}"}), 500
 
 @app.route('/get_predecessor', methods=['GET'])
 def get_predecessor():
@@ -315,31 +317,39 @@ def notify():
     #maneja las notificaciones sobre nuevos predecesores
     data = request.json
     if not data or 'id' not in data:
-        return jsonify({'error': 'invalid request'}), 400
+        return jsonify({'error': 'Invalid request'}), 400
     node.notify(data)
-    return jsonify({'message': 'predecesor actualizado'})
+    return jsonify({'message': 'Predecesor actualizado'})
 
 @app.route('/search', methods=['POST'])
 def search():
     try:
         data = request.json
         if 'filename' not in data:
-            return jsonify({'error': 'missing filename'}), 400
+            return jsonify({'error': 'Missing filename'}), 400
 
         result = node.search(data['filename'])
         return jsonify(result)
     except Exception as e:
-        print(f"error en /search: {str(e)}")
-        return jsonify({'error': f"internal server error: {str(e)}"}), 500
+        print(f"Error en /search: {str(e)}")
+        return jsonify({'error': f"Internal server error: {str(e)}"}), 500
 
 @app.route('/ping', methods=['GET'])
 def ping():
     #función simple para verificar si el nodo está activo
-    return jsonify({'message': 'pong'})
+    return jsonify({'message': 'Pong'})
 
 def serve_rest() -> None:
     #inicia el servidor rest
     app.run(host=node.ip, port=node.port)
+
+def exit_program():
+    #cierra de manera segura todos los hilos y termina el programa
+    print("Cerrando nodos y finalizando el programa...")
+    for thread in threading.enumerate():
+        if thread is not threading.current_thread():
+            thread.join(timeout=1)
+    sys.exit(0)
 
 def main() -> None:
     #lee la configuración desde el archivo bootstrap.json
@@ -357,10 +367,17 @@ def main() -> None:
     node.bootstrap()
 
     #iniciamos los servidores y procesos de estabilización
-    threading.Thread(target=serve_rest).start()
-    threading.Thread(target=node.serve_grpc).start()  #iniciar el servidor grpc en un hilo separado
-    threading.Thread(target=node.stabilize).start()
-    threading.Thread(target=node.check_predecessor).start()
+    rest_thread = threading.Thread(target=serve_rest)
+    grpc_thread = threading.Thread(target=node.serve_grpc)
+    stabilize_thread = threading.Thread(target=node.stabilize)
+    check_predecessor_thread = threading.Thread(target=node.check_predecessor)
+
+    node.threads.extend([rest_thread, grpc_thread, stabilize_thread, check_predecessor_thread])
+
+    rest_thread.start()
+    grpc_thread.start()
+    stabilize_thread.start()
+    check_predecessor_thread.start()
 
     #loop principal para manejar comandos desde la consola
     while True:
@@ -370,14 +387,14 @@ def main() -> None:
                 _, filename, content = command.split(maxsplit=2)
                 print(node.store_file_grpc(filename, content))
             except:
-                print("comando inválido. uso correcto: store <filename> <content>")
+                print("Comando inválido. Uso correcto: store <filename> <content>")
                 continue
         elif command.startswith("lookup"):
             try:
                 _, filename = command.split()
                 print(node.lookup_file(filename))
             except:
-                print("comando inválido. uso correcto: lookup <filename>")
+                print("Comando inválido. Uso correcto: lookup <filename>")
                 continue
         elif command.startswith("search"):
             try:
@@ -386,30 +403,33 @@ def main() -> None:
                 if 'error' in response:
                     print(response['error'])
                 else:
-                    print(f"archivo '{filename}' está en {response['url']}")
+                    print(f"Archivo '{filename}' está en {response['url']}")
             except:
-                print("comando inválido. uso correcto: search <filename>")
+                print("Comando inválido. Uso correcto: search <filename>")
                 continue
         elif command.startswith("download"):
             try:
                 _, filename = command.split()
                 content = node.download_file_grpc(filename)
-                print(f"contenido descargado: {content}")
+                print(f"Contenido descargado: {content}")
             except:
-                print("comando inválido. uso correcto: download <filename>")
+                print("Comando inválido. Uso correcto: download <filename>")
                 continue
         elif command == "info":
             node.display_info()
         elif command == "help":
-            print("comandos disponibles:")
-            print("  store <filename> <content>: almacena un archivo en la red")
-            print("  lookup <filename>: busca un archivo en el nodo actual")
-            print("  search <filename>: busca un archivo en la red")
-            print("  download <filename>: descarga un archivo de la red")
-            print("  info: muestra información del nodo actual")
-            print("  help: muestra esta ayuda")
+            print("Comandos disponibles:")
+            print("  store <filename> <content>: Almacena un archivo en la red")
+            print("  lookup <filename>: Busca un archivo en el nodo actual")
+            print("  search <filename>: Busca un archivo en la red")
+            print("  download <filename>: Descarga un archivo de la red")
+            print("  info: Muestra información del nodo actual")
+            print("  help: Muestra esta ayuda")
+            print("  exit: Cierra el programa de forma segura")
+        elif command == "exit":
+            exit_program()
         else:
-            print("comando no reconocido")
+            print("Comando no reconocido")
 
 def hash_key(key: str) -> int:
     #genera un id único basado en el hash sha-1 de la clave
