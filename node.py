@@ -217,16 +217,11 @@ class Node:
             #el servidor grpc está en el puerto rest + 1
             print(f"Almacenando archivo en nodo {responsible_node['id']}")
             with grpc.insecure_channel(f"{responsible_node['ip']}:{responsible_node['port'] + 1}") as channel:
-                print(1)
                 stub = pb2_grpc.ChordServiceStub(channel)
-                print(2)
                 request = pb2.FileRequest(filename=filename, content=content)
-                print(3)
                 response = stub.StoreFile(request)
                 print(response)
-                print(4)
                 return response.message
-                print(5)
         except Exception as e:
             print(f"Se lanzó una excepción de tipo: {type(e).__name__}")
             print(f"Mensaje de la excepción: {str(e)}")
@@ -257,9 +252,10 @@ class Node:
                 except:
                     return "Error al descargar el archivo"
         except Exception as e:
-            print(f"Se lanzó una excepción de tipo: {type(e).__name__}")
-            print(f"Mensaje de la excepción: {str(e)}")
-            return f"Error al descargar el archivo del nodo {responsible_node['id']}"
+            #print(f"Se lanzó una excepción de tipo: {type(e).__name__}")
+            #print(f"Mensaje de la excepción: {str(e)}")
+            print(f"El nodo no tiene el archivo {responsible_node['id']}")
+            return "Error: Nodo no tiene el archivo"
 
     def serve_grpc(self):
         #inicia el servidor grpc para manejar la transferencia de archivos
@@ -274,10 +270,11 @@ class Node:
         #convierte la información del nodo a un diccionario para fácil transmisión
         return {'ip': self.ip, 'port': self.port, 'id': self.id}
 
-    def store_file(self, filename: str) -> str:
+    def store_file(self, filename: str, content: str) -> str:
         #almacena el archivo en el nodo actual
-        self.files[filename] = f"Contenido de {filename}"
-        return f"Archivo '{filename}' almacenado en el nodo {self.id}"
+        print(f"Contenido descargado: {content}")
+        self.files[filename] = content
+        return f"El archivo '{filename}' ha sido almacenado en el nodo actual ({self.id})"
 
     def lookup_file(self, filename: str) -> str:
         #busca el archivo en el nodo actual
@@ -300,10 +297,11 @@ class Node:
             print(f"  ID: {self.predecessor['id']}, IP: {self.predecessor['ip']}, Puerto: {self.predecessor['port']}\n")
         else:
             print("  Ninguno\n")
-        print("\nArchivos almacenados:")
+        print(f"{self.predecessor['id'] or "None"}->{self.id}->{self.successor['id'] or "None"}\n")
+        print("Archivos almacenados:")
         if self.files:
             for filename in self.files:
-                print(f"  - {filename}")
+                print(f"  - {filename} \t = {self.files[filename]}")
         else:
             print("  No hay archivos almacenados")
         print("===========================\n")
@@ -439,7 +437,11 @@ def main() -> None:
             try:
                 _, filename = command.split()
                 content = node.download_file_grpc(filename)
-                print(f"Contenido descargado: {content}")
+                if filename not in node.files:
+                    if content[:6] != "Error:":
+                        print(node.store_file(filename, content))
+                    else:
+                        print(content)
             except:
                 print("Comando inválido. Uso correcto: download <filename>")
                 continue
