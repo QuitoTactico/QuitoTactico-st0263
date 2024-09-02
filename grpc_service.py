@@ -25,5 +25,5 @@ class ChordService(pb2_grpc.ChordServiceServicer):
         else:
             context.set_code(grpc.StatusCode.NOT_FOUND)
             context.set_details(f"Archivo '{filename}' no encontrado en nodo {self.node.id}")
-            return pb2.FileResponse()
+            return pb2.FileResponse(content="No encontrado.") #no se puede devolver None
 

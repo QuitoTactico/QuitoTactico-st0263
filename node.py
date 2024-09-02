@@ -209,11 +209,13 @@ class Node:
         file_id = hash_key(filename)
         responsible_node = self.find_successor(file_id)
 
-        if not responsible_node:
+        if not responsible_node or ('error' in responsible_node) or ('id' not in responsible_node):
             return "Error: No se pudo encontrar el nodo responsable"
 
         try:
             #conectamos al nodo responsable y enviamos el archivo
+            #el servidor grpc está en el puerto rest + 1
+            print(f"Almacenando archivo en nodo {responsible_node['id']}")
             with grpc.insecure_channel(f"{responsible_node['ip']}:{responsible_node['port'] + 1}") as channel:
                 stub = pb2_grpc.ChordServiceStub(channel)
                 request = pb2.FileRequest(filename=filename, content=content)
@@ -229,16 +231,24 @@ class Node:
         file_id = hash_key(filename)
         responsible_node = self.find_successor(file_id)
 
-        if not responsible_node:
+        if not responsible_node or ('error' in responsible_node) or ('id' not in responsible_node):
             return "Error: No se pudo encontrar el nodo responsable"
 
         try:
             #conectamos al nodo responsable y solicitamos el archivo
+            #el servidor grpc está en el puerto rest + 1
+            print(f"Descargando archivo de nodo {responsible_node['id']}")
             with grpc.insecure_channel(f"{responsible_node['ip']}:{responsible_node['port'] + 1}") as channel:
                 stub = pb2_grpc.ChordServiceStub(channel)
                 request = pb2.FileRequest(filename=filename)
                 response = stub.DownloadFile(request)
-                return response.content
+                #manejamos la respuesta del servidor grpc, pudo ser un error o el contenido del archivo
+                try:
+                    if not response.content:
+                        return "Archivo no encontrado en nodo responsable"
+                    return response.content
+                except:
+                    return "Error al descargar el archivo"
         except:
             print(f"Error al descargar archivo de nodo {responsible_node['id']}")
             return "Error al descargar el archivo"
