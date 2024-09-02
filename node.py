@@ -7,6 +7,8 @@ import chord_pb2 as pb2
 import hashlib
 import time
 import json
+from concurrent import futures
+from grpc_service import ChordService
 
 app = Flask(__name__)
 
@@ -14,6 +16,7 @@ class Node:
     def __init__(self, ip: str, port: int, id: int, update_interval: int, config: dict) -> None:
         self.ip = ip  #ip del nodo donde estará escuchando
         self.port = port  #puerto del nodo donde estará escuchando
+        self.grpc_port = port + 1  #puerto para el servidor gRPC (puerto REST + 1)
         self.id = id  #id del nodo calculado con hash
         self.update_interval = update_interval  #intervalo de estabilización
         self.successor = {}  #sucesor inicial como un diccionario vacío
@@ -162,6 +165,79 @@ class Node:
                             self.bootstrap()
             time.sleep(self.update_interval)
 
+    def find_responsible_node(self, file_id: int) -> dict:
+        #encuentra el nodo responsable de un archivo basado en el ID del archivo.
+        #comenzamos preguntando al nodo actual
+        current_node = self.to_dict()
+
+        while True:
+            #si el id del archivo está entre el nodo actual y su sucesor, retornamos el sucesor
+            if self.is_in_interval(file_id, current_node['id'], self.successor['id']):
+                return self.successor
+            else:
+                #si no es así, seguimos preguntando al sucesor
+                next_node = self.successor
+                url = f"http://{next_node['ip']}:{next_node['port']}/find_successor"
+                try:
+                    response = requests.post(url, json={'id': file_id})
+                    response.raise_for_status()
+                    next_node = response.json()
+                    
+                    #actualizamos el nodo actual y seguimos
+                    current_node = next_node
+                except requests.exceptions.RequestException as e:
+                    print(f"Error al contactar al nodo {next_node['id']}: {e}")
+                    return {}
+
+    def store_file_grpc(self, filename: str, content: str) -> str:
+        #almacena un archivo en el nodo responsable utilizando gRPC.
+        #calculamos el ID del archivo
+        file_id = hash_key(filename)
+        responsible_node = self.find_responsible_node(file_id)
+
+        if not responsible_node:
+            return "Error: No se pudo encontrar el nodo responsable"
+
+        try:
+            #conectamos al nodo responsable y enviamos el archivo
+            with grpc.insecure_channel(f"{responsible_node['ip']}:{responsible_node['port'] + 1}") as channel:
+                stub = pb2_grpc.ChordServiceStub(channel)
+                request = pb2.FileRequest(filename=filename, content=content)
+                response = stub.StoreFile(request)
+                return response.message
+        except grpc.RpcError as e:
+            print(f"Error al almacenar archivo en nodo {responsible_node['id']}: {e}")
+            return "Error al almacenar el archivo"
+
+    def download_file_grpc(self, filename: str) -> str:
+        #descarga un archivo del nodo responsable utilizando gRPC.
+        #calculamos el ID del archivo
+        file_id = hash_key(filename)
+        responsible_node = self.find_responsible_node(file_id)
+
+        if not responsible_node:
+            return "Error: No se pudo encontrar el nodo responsable"
+
+        try:
+            #conectamos al nodo responsable y solicitamos el archivo
+            with grpc.insecure_channel(f"{responsible_node['ip']}:{responsible_node['port'] + 1}") as channel:
+                stub = pb2_grpc.ChordServiceStub(channel)
+                request = pb2.FileRequest(filename=filename)
+                response = stub.DownloadFile(request)
+                return response.content
+        except grpc.RpcError as e:
+            print(f"Error al descargar archivo de nodo {responsible_node['id']}: {e}")
+            return "Error al descargar el archivo"
+
+    def serve_grpc(self):
+        #inicia el servidor gRPC para manejar la transferencia de archivos.
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        pb2_grpc.add_ChordServiceServicer_to_server(ChordService(self), server)
+        server.add_insecure_port(f"[::]:{self.grpc_port}")
+        server.start()
+        print(f"Servidor gRPC escuchando en el puerto {self.grpc_port}")
+        server.wait_for_termination()
+
     def to_dict(self) -> dict:
         #convierte la información del nodo a un diccionario para fácil transmisión
         return {'ip': self.ip, 'port': self.port, 'id': self.id}
@@ -199,76 +275,6 @@ class Node:
         else:
             print("  No hay archivos almacenados")
         print("===========================\n")
-
-    def find_responsible_node(self, file_id: int) -> dict:
-        """
-        Encuentra el nodo responsable de un archivo basado en el ID del archivo.
-        """
-        #comenzamos preguntando al nodo actual
-        current_node = self.to_dict()
-
-        while True:
-            #si el id del archivo está entre el nodo actual y su sucesor, retornamos el sucesor
-            if self.is_in_interval(file_id, current_node['id'], self.successor['id']):
-                return self.successor
-            else:
-                #si no es así, seguimos preguntando al sucesor
-                next_node = self.successor
-                url = f"http://{next_node['ip']}:{next_node['port']}/find_successor"
-                try:
-                    response = requests.post(url, json={'id': file_id})
-                    response.raise_for_status()
-                    next_node = response.json()
-                    
-                    #actualizamos el nodo actual y seguimos
-                    current_node = next_node
-                except requests.exceptions.RequestException as e:
-                    print(f"Error al contactar al nodo {next_node['id']}: {e}")
-                    return {}
-
-    def store_file_grpc(self, filename: str, content: str) -> str:
-        """
-        Almacena un archivo en el nodo responsable utilizando gRPC.
-        """
-        #calculamos el ID del archivo
-        file_id = hash_key(filename)
-        responsible_node = self.find_responsible_node(file_id)
-
-        if not responsible_node:
-            return "Error: No se pudo encontrar el nodo responsable"
-
-        try:
-            #conectamos al nodo responsable y enviamos el archivo
-            with grpc.insecure_channel(f"{responsible_node['ip']}:{responsible_node['port']}") as channel:
-                stub = pb2_grpc.ChordServiceStub(channel)
-                request = pb2.FileRequest(filename=filename, content=content)
-                response = stub.StoreFile(request)
-                return response.message
-        except grpc.RpcError as e:
-            print(f"Error al almacenar archivo en nodo {responsible_node['id']}: {e}")
-            return "Error al almacenar el archivo"
-
-    def download_file_grpc(self, filename: str) -> str:
-        """
-        Descarga un archivo del nodo responsable utilizando gRPC.
-        """
-        #calculamos el ID del archivo
-        file_id = hash_key(filename)
-        responsible_node = self.find_responsible_node(file_id)
-
-        if not responsible_node:
-            return "Error: No se pudo encontrar el nodo responsable"
-
-        try:
-            #conectamos al nodo responsable y solicitamos el archivo
-            with grpc.insecure_channel(f"{responsible_node['ip']}:{responsible_node['port']}") as channel:
-                stub = pb2_grpc.ChordServiceStub(channel)
-                request = pb2.FileRequest(filename=filename)
-                response = stub.DownloadFile(request)
-                return response.content
-        except grpc.RpcError as e:
-            print(f"Error al descargar archivo de nodo {responsible_node['id']}: {e}")
-            return "Error al descargar el archivo"
 
 #---------------------------------------------- REST API ----------------------------------------------
 
@@ -350,6 +356,7 @@ def main() -> None:
 
     #iniciamos los servidores y procesos de estabilización
     threading.Thread(target=serve_rest).start()
+    threading.Thread(target=node.serve_grpc).start()  #iniciar el servidor gRPC en un hilo separado
     threading.Thread(target=node.stabilize).start()
     threading.Thread(target=node.check_predecessor).start()
 
