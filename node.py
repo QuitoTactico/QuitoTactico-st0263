@@ -227,9 +227,10 @@ class Node:
                 print(4)
                 return response.message
                 print(5)
-        except:
-            print(f"Error al almacenar archivo en nodo {responsible_node['id']}")
-            return "Error al almacenar el archivo"
+        except Exception as e:
+            print(f"Se lanzó una excepción de tipo: {type(e).__name__}")
+            print(f"Mensaje de la excepción: {str(e)}")
+            return f"Error al almacenar el archivo en el nodo {responsible_node['id']}"
 
     def download_file_grpc(self, filename: str) -> str:
         #descarga un archivo del nodo responsable utilizando grpc
@@ -255,9 +256,10 @@ class Node:
                     return response.content
                 except:
                     return "Error al descargar el archivo"
-        except:
-            print(f"Error al descargar archivo de nodo {responsible_node['id']}")
-            return "Error al descargar el archivo"
+        except Exception as e:
+            print(f"Se lanzó una excepción de tipo: {type(e).__name__}")
+            print(f"Mensaje de la excepción: {str(e)}")
+            return f"Error al descargar el archivo del nodo {responsible_node['id']}"
 
     def serve_grpc(self):
         #inicia el servidor grpc para manejar la transferencia de archivos
