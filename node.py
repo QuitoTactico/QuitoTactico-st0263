@@ -217,10 +217,15 @@ class Node:
             #el servidor grpc está en el puerto rest + 1
             print(f"Almacenando archivo en nodo {responsible_node['id']}")
             with grpc.insecure_channel(f"{responsible_node['ip']}:{responsible_node['port'] + 1}") as channel:
+                print(1)
                 stub = pb2_grpc.ChordServiceStub(channel)
+                print(2)
                 request = pb2.FileRequest(filename=filename, content=content)
+                print(3)
                 response = stub.StoreFile(request)
+                print(4)
                 return response.message
+                print(5)
         except:
             print(f"Error al almacenar archivo en nodo {responsible_node['id']}")
             return "Error al almacenar el archivo"
