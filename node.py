@@ -40,8 +40,8 @@ class Node:
                 response.raise_for_status()
                 self.successor = response.json()
                 print(f"Sucesor inicial establecido: {self.successor['id']} ({self.successor['ip']}:{self.successor['port']})")
-            except requests.exceptions.RequestException as e:
-                print(f"Error al conectarse al nodo bootstrap: {e}")
+            except:
+                print(f"Error al conectarse al nodo bootstrap")
                 self.successor = self.to_dict()
         else:
             #si no hay nodo bootstrap, nos establecemos como nuestro propio sucesor y predecesor
@@ -76,8 +76,8 @@ class Node:
                         return next_successor
                     else:
                         next_node = next_successor
-                except requests.exceptions.RequestException as e:
-                    print(f"[find_successor] Error al contactar al nodo {next_node['id']}: {e}")
+                except:
+                    print(f"[find_successor] Error al contactar al nodo {next_node['id']}")
                     return {}
                 attempts += 1
             print(f"[find_successor] Exceso de intentos para encontrar sucesor de ID {id_to_find}")
@@ -156,7 +156,7 @@ class Node:
                     response = requests.get(url)
                     response.raise_for_status()
                     self.predecessor_fails = 0  #resetea el contador de fallos
-                except requests.exceptions.RequestException:
+                except:
                     print(f"Predecesor {self.predecessor['id']} no responde. Eliminando predecesor.")
                     self.predecessor = {}
                     self.predecessor_fails += 1
@@ -189,8 +189,8 @@ class Node:
                     
                     #actualizamos el nodo actual y seguimos
                     current_node = next_node
-                except requests.exceptions.RequestException as e:
-                    print(f"Error al contactar al nodo {next_node['id']}: {e}")
+                except:
+                    print(f"Error al contactar al nodo {next_node['id']}")
                     return {}
 
     def store_file_grpc(self, filename: str, content: str) -> str:
@@ -209,8 +209,8 @@ class Node:
                 request = pb2.FileRequest(filename=filename, content=content)
                 response = stub.StoreFile(request)
                 return response.message
-        except grpc.RpcError as e:
-            print(f"Error al almacenar archivo en nodo {responsible_node['id']}: {e}")
+        except:
+            print(f"Error al almacenar archivo en nodo {responsible_node['id']}")
             return "Error al almacenar el archivo"
 
     def download_file_grpc(self, filename: str) -> str:
@@ -229,8 +229,8 @@ class Node:
                 request = pb2.FileRequest(filename=filename)
                 response = stub.DownloadFile(request)
                 return response.content
-        except grpc.RpcError as e:
-            print(f"Error al descargar archivo de nodo {responsible_node['id']}: {e}")
+        except:
+            print(f"Error al descargar archivo de nodo {responsible_node['id']}")
             return "Error al descargar el archivo"
 
     def serve_grpc(self):
