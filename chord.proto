@@ -1,18 +1,16 @@
 syntax = "proto3";
 
 service ChordService {
-  rpc StoreFile(FileRequest) returns (FileResponse);
-  rpc DownloadFile(FileRequest) returns (FileResponse);
+    rpc StoreFile (FileRequest) returns (FileResponse);
+    rpc DownloadFile (FileRequest) returns (FileResponse);
 }
 
 message FileRequest {
-  string filename = 1;
-  string content = 2; // El contenido del archivo como string
+    string filename = 1;
+    string content = 2; // solo necesario para el almacenamiento
 }
 
 message FileResponse {
-  string message = 1;
-  string content = 2; // El contenido del archivo como string
+    string message = 1;  // para respuestas de éxito
+    string content = 2;  // para devolver contenido del archivo
 }
-
-message Empty {}

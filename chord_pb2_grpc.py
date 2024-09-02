@@ -39,13 +39,8 @@ class ChordServiceStub(object):
                 request_serializer=chord__pb2.FileRequest.SerializeToString,
                 response_deserializer=chord__pb2.FileResponse.FromString,
                 _registered_method=True)
-        self.LookupFile = channel.unary_unary(
-                '/ChordService/LookupFile',
-                request_serializer=chord__pb2.FileRequest.SerializeToString,
-                response_deserializer=chord__pb2.FileResponse.FromString,
-                _registered_method=True)
-        self.TransferFile = channel.unary_unary(
-                '/ChordService/TransferFile',
+        self.DownloadFile = channel.unary_unary(
+                '/ChordService/DownloadFile',
                 request_serializer=chord__pb2.FileRequest.SerializeToString,
                 response_deserializer=chord__pb2.FileResponse.FromString,
                 _registered_method=True)
@@ -60,13 +55,7 @@ class ChordServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def LookupFile(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def TransferFile(self, request, context):
+    def DownloadFile(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -80,13 +69,8 @@ def add_ChordServiceServicer_to_server(servicer, server):
                     request_deserializer=chord__pb2.FileRequest.FromString,
                     response_serializer=chord__pb2.FileResponse.SerializeToString,
             ),
-            'LookupFile': grpc.unary_unary_rpc_method_handler(
-                    servicer.LookupFile,
-                    request_deserializer=chord__pb2.FileRequest.FromString,
-                    response_serializer=chord__pb2.FileResponse.SerializeToString,
-            ),
-            'TransferFile': grpc.unary_unary_rpc_method_handler(
-                    servicer.TransferFile,
+            'DownloadFile': grpc.unary_unary_rpc_method_handler(
+                    servicer.DownloadFile,
                     request_deserializer=chord__pb2.FileRequest.FromString,
                     response_serializer=chord__pb2.FileResponse.SerializeToString,
             ),
@@ -129,7 +113,7 @@ class ChordService(object):
             _registered_method=True)
 
     @staticmethod
-    def LookupFile(request,
+    def DownloadFile(request,
             target,
             options=(),
             channel_credentials=None,
@@ -142,34 +126,7 @@ class ChordService(object):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/ChordService/LookupFile',
-            chord__pb2.FileRequest.SerializeToString,
-            chord__pb2.FileResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def TransferFile(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/ChordService/TransferFile',
+            '/ChordService/DownloadFile',
             chord__pb2.FileRequest.SerializeToString,
             chord__pb2.FileResponse.FromString,
             options,

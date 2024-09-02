@@ -223,6 +223,7 @@ class Node:
                 request = pb2.FileRequest(filename=filename, content=content)
                 print(3)
                 response = stub.StoreFile(request)
+                print(response)
                 print(4)
                 return response.message
                 print(5)
