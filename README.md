@@ -64,33 +64,43 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
    pip3 install -r requirements.txt
    ```
 
-2. **Compilar el archivo `.proto`:**
-
-   Si necesitas compilar el archivo `chord.proto`, utiliza el siguiente comando:
+2. **Cambiar bootstrap rápido de máquina ya montada:**
 
    ```bash
-   python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. chord.proto
+   cd QuitoTactico-st0263
+   git pull
+   sudo nano bootstrap.json
    ```
-
-   Esto generará los archivos `chord_pb2.py` y `chord_pb2_grpc.py`.
 
 3. **Iniciar el primer nodo:**
 
    ```bash
+   cd QuitoTactico-st0263
+   git pull
    sudo nano bootstrap.json
    # Agregar la IP propia en "own_ip" y el puerto en "own_port"
-   # Dejar en blanco "bootstrap_ip" y "bootstrap_port" si este es el primer nodo
+   # Dejar en blanco "bootstrap_ip" y "bootstrap_port", ya sea no definiéndolos o dejándolos como ""
    python3 node.py
    ```
 
-4. **Iniciar nodos adicionales:**
+4. **Iniciar los nodos siguientes:**
 
    ```bash
+   cd QuitoTactico-st0263
+   git pull
    sudo nano bootstrap.json
    # Agregar la IP propia en "own_ip" y el puerto en "own_port"
    # Agregar la IP a la que se conectará en "bootstrap_ip" y el puerto en "bootstrap_port"
    python3 node.py
    ```
+
+### Misceláneo:
+
+- **Si quieres compilar el proto (asegúrate de instalar requirements.txt primero):**
+
+  ```bash
+  python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. chord.proto
+  ```
 
 ### Detalles técnicos:
 
@@ -115,7 +125,6 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
 - **`bootstrap.json`**: Archivo de configuración para los nodos.
 - **`node.py`**: Implementa la lógica del nodo, la comunicación REST y los comandos de consola.
 - **`chord.proto`**: Definición del servicio gRPC para la transferencia de archivos.
-- **`grpc_service.py`**: Implementación del servicio gRPC basado en el archivo `.proto`.
 
 ---
 
@@ -175,3 +184,5 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
 - **Chord: A Scalable Peer-to-peer Lookup Service for Internet Applications** [Chord Paper](https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf)
 - **Flask Documentation:** [https://flask.palletsprojects.com/en/2.0.x/](https://flask.palletsprojects.com/en/2.0.x/)
 - **AWS EC2 Documentation:** [https://docs.aws.amazon.com/ec2/](https://docs.aws.amazon.com/ec2/)
+
+---
