@@ -123,8 +123,10 @@ class Node:
 
                 #notificamos al sucesor que este nodo es su predecesor si es necesario
                 if not self.predecessor or self.is_in_interval(self.id, self.predecessor['id'], self.successor['id']):
-                    notify_url = f"http://{self.successor['ip']}:{self.successor['port']}/notify"
-                    requests.post(notify_url, json=self.to_dict())
+                    #evitamos enviar la notificación si el predecesor del sucesor ya somos nosotros mismos
+                    if not (successor_predecessor and successor_predecessor['id'] == self.id):
+                        notify_url = f"http://{self.successor['ip']}:{self.successor['port']}/notify"
+                        requests.post(notify_url, json=self.to_dict())
                 
                 self.successor_fails = 0  #resetea el contador de fallos
             except:
@@ -133,8 +135,14 @@ class Node:
                 if self.successor_fails >= 3:
                     print("Demasiados errores de estabilización con sucesor, ", end="")
                     if self.predecessor:
-                        print("Poniendo a predecesor como sucesor")
-                        self.successor = self.predecessor
+                        try:
+                            url = f"http://{self.successor['ip']}:{self.successor['port']}/ping"
+                            response = requests.get(url)
+                            response.raise_for_status()
+                            self.successor_fails = 0  #resetea el contador de fallos
+                        except:
+                            print("Poniendo a predecesor como sucesor")
+                            self.successor = self.predecessor
                     else:
                         print("Comenzando con bootstrap")
                         self.bootstrap()
@@ -170,6 +178,7 @@ class Node:
                             self.bootstrap()
             time.sleep(self.update_interval)
 
+    '''
     def find_responsible_node(self, file_id: int) -> dict:
         #encuentra el nodo responsable de un archivo basado en el id del archivo
         current_node = self.to_dict()
@@ -181,7 +190,7 @@ class Node:
             else:
                 #si no es así, seguimos preguntando al sucesor
                 next_node = self.successor
-                url = f"http://{next_node['ip']}:{next_node['port']}/find_successor"
+                url = f"http://{next_node['ip']}:{next_node['port']}/get_successor" #intentamos que parezca el find_successor
                 try:
                     response = requests.post(url, json={'id': file_id})
                     response.raise_for_status()
@@ -192,12 +201,13 @@ class Node:
                 except:
                     print(f"Error al contactar al nodo {next_node['id']}")
                     return {}
+    '''
 
     def store_file_grpc(self, filename: str, content: str) -> str:
         #almacena un archivo en el nodo responsable utilizando grpc
         #calculamos el id del archivo
         file_id = hash_key(filename)
-        responsible_node = self.find_responsible_node(file_id)
+        responsible_node = self.find_successor(file_id)
 
         if not responsible_node:
             return "Error: No se pudo encontrar el nodo responsable"
@@ -217,7 +227,7 @@ class Node:
         #descarga un archivo del nodo responsable utilizando grpc
         #calculamos el id del archivo
         file_id = hash_key(filename)
-        responsible_node = self.find_responsible_node(file_id)
+        responsible_node = self.find_successor(file_id)
 
         if not responsible_node:
             return "Error: No se pudo encontrar el nodo responsable"
