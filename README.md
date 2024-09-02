@@ -9,7 +9,7 @@ Alvaro Enrique Ospina SanJuan, aeospinas@eafit.edu.co
 
 ---
 
-## 1. Breve descripción:
+## 1. Breve descripción
 
 Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Chord. La red Chord permite la distribución y búsqueda eficiente de claves (archivos) en un sistema distribuido. Las operaciones de red, como la búsqueda de sucesores y la notificación entre nodos, se manejan mediante una API REST desarrollada con Flask, mientras que la transferencia de archivos se simula utilizando gRPC. El sistema permite la adición dinámica de nodos a la red, la estabilización automática y operaciones de almacenamiento y búsqueda de archivos a través de comandos de consola.
 
@@ -22,6 +22,7 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
 - Verificación periódica de la disponibilidad del predecesor para asegurar la consistencia de la red.
 - Interfaz de comandos para almacenar, buscar archivos y obtener información del nodo.
 - El sistema se puede desplegar en instancias EC2 de AWS.
+- Implementación de una opción segura para salir del programa (`exit`), asegurando que todos los hilos se cierren correctamente.
 
 ### 1.2. Aspectos NO cumplidos o desarrollados de la actividad propuesta por el profesor (requerimientos funcionales y no funcionales):
 
@@ -29,10 +30,10 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
 - No se implementó la tabla de fingers para mejorar la eficiencia en la búsqueda de sucesores, simplificando así el modelo a O(N).
 - No se implementó la solución usando un Message Oriented Middleware (MOM) por la razón:
     - Facilidad de implementación: se optó por un modelo de peticiones API REST que procesa las solicitudes directamente, evitando la complejidad adicional de un middleware.
-  
+
 ---
 
-## 2. Información general de diseño de alto nivel, arquitectura, patrones, mejores prácticas utilizadas:
+## 2. Información general de diseño de alto nivel, arquitectura, patrones, mejores prácticas utilizadas
 
 - **Arquitectura P2P basada en Chord (simplificada):** La red se organiza en un anillo, lo que permite la búsqueda de archivos utilizando sucesores y predecesores.
 - **REST API para comunicación:** Flask se utiliza para manejar las operaciones de red, proporcionando flexibilidad y facilidad de depuración.
@@ -42,7 +43,7 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
 
 ---
 
-## 3. Descripción del ambiente de desarrollo y técnico:
+## 3. Descripción del ambiente de desarrollo y técnico
 
 - **Lenguaje de programación:** Python 3.12
 - **Librerías y paquetes utilizados:**
@@ -102,15 +103,6 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
   python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. chord.proto
   ```
 
-### Detalles técnicos:
-
-- **Compilación de archivos .proto:**
-  Si es necesario recompilar los archivos `.proto`, se puede hacer con el siguiente comando:
-
-  ```bash
-  python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. chord.proto
-  ```
-
 ### Descripción y configuración de parámetros:
 
 - **Archivo de configuración `bootstrap.json`:**
@@ -128,7 +120,7 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
 
 ---
 
-## 4. Descripción del ambiente de EJECUCIÓN (en producción):
+## 4. Descripción del ambiente de EJECUCIÓN (en producción)
 
 - **Lenguaje de programación:** Python 3.12
 - **Librerías y paquetes utilizados:**
@@ -151,7 +143,7 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
 
 - **Para almacenar un archivo (desde la consola):**
   ```bash
-  > store tarea.txt
+  > store tarea.txt "Contenido del archivo"
   ```
 
 - **Para buscar un archivo (desde la consola):**
@@ -169,6 +161,11 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
   > info
   ```
 
+- **Para salir del programa de forma segura:**
+  ```bash
+  > exit
+  ```
+
 ---
 
 ## 5. Otra información relevante:
@@ -184,5 +181,3 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
 - **Chord: A Scalable Peer-to-peer Lookup Service for Internet Applications** [Chord Paper](https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf)
 - **Flask Documentation:** [https://flask.palletsprojects.com/en/2.0.x/](https://flask.palletsprojects.com/en/2.0.x/)
 - **AWS EC2 Documentation:** [https://docs.aws.amazon.com/ec2/](https://docs.aws.amazon.com/ec2/)
-
----
