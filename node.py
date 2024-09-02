@@ -7,7 +7,6 @@ import chord_pb2 as pb2
 import hashlib
 import time
 import json
-from grpc_service import serve_grpc
 
 app = Flask(__name__)
 
@@ -20,7 +19,7 @@ class Node:
         self.successor = {}  #sucesor inicial como un diccionario vacío
         self.predecessor = {}  #predecesor inicial como un diccionario vacío
         self.files = {}  #diccionario para almacenar archivos
-        self.config = config #configuración del nodo, bootstrap
+        self.config = config  #configuración del nodo, bootstrap
         self.successor_fails = 0  #contador de fallos del sucesor
         self.predecessor_fails = 0  #contador de fallos del predecesor
 
@@ -201,6 +200,76 @@ class Node:
             print("  No hay archivos almacenados")
         print("===========================\n")
 
+    def find_responsible_node(self, file_id: int) -> dict:
+        """
+        Encuentra el nodo responsable de un archivo basado en el ID del archivo.
+        """
+        #comenzamos preguntando al nodo actual
+        current_node = self.to_dict()
+
+        while True:
+            #si el id del archivo está entre el nodo actual y su sucesor, retornamos el sucesor
+            if self.is_in_interval(file_id, current_node['id'], self.successor['id']):
+                return self.successor
+            else:
+                #si no es así, seguimos preguntando al sucesor
+                next_node = self.successor
+                url = f"http://{next_node['ip']}:{next_node['port']}/find_successor"
+                try:
+                    response = requests.post(url, json={'id': file_id})
+                    response.raise_for_status()
+                    next_node = response.json()
+                    
+                    #actualizamos el nodo actual y seguimos
+                    current_node = next_node
+                except requests.exceptions.RequestException as e:
+                    print(f"Error al contactar al nodo {next_node['id']}: {e}")
+                    return {}
+
+    def store_file_grpc(self, filename: str, content: str) -> str:
+        """
+        Almacena un archivo en el nodo responsable utilizando gRPC.
+        """
+        #calculamos el ID del archivo
+        file_id = hash_key(filename)
+        responsible_node = self.find_responsible_node(file_id)
+
+        if not responsible_node:
+            return "Error: No se pudo encontrar el nodo responsable"
+
+        try:
+            #conectamos al nodo responsable y enviamos el archivo
+            with grpc.insecure_channel(f"{responsible_node['ip']}:{responsible_node['port']}") as channel:
+                stub = pb2_grpc.ChordServiceStub(channel)
+                request = pb2.FileRequest(filename=filename, content=content)
+                response = stub.StoreFile(request)
+                return response.message
+        except grpc.RpcError as e:
+            print(f"Error al almacenar archivo en nodo {responsible_node['id']}: {e}")
+            return "Error al almacenar el archivo"
+
+    def download_file_grpc(self, filename: str) -> str:
+        """
+        Descarga un archivo del nodo responsable utilizando gRPC.
+        """
+        #calculamos el ID del archivo
+        file_id = hash_key(filename)
+        responsible_node = self.find_responsible_node(file_id)
+
+        if not responsible_node:
+            return "Error: No se pudo encontrar el nodo responsable"
+
+        try:
+            #conectamos al nodo responsable y solicitamos el archivo
+            with grpc.insecure_channel(f"{responsible_node['ip']}:{responsible_node['port']}") as channel:
+                stub = pb2_grpc.ChordServiceStub(channel)
+                request = pb2.FileRequest(filename=filename)
+                response = stub.DownloadFile(request)
+                return response.content
+        except grpc.RpcError as e:
+            print(f"Error al descargar archivo de nodo {responsible_node['id']}: {e}")
+            return "Error al descargar el archivo"
+
 #---------------------------------------------- REST API ----------------------------------------------
 
 @app.route('/find_successor', methods=['POST'])
@@ -211,7 +280,7 @@ def find_successor_route():
             return jsonify({'error': 'Missing id'}), 400
         
         node_id = data['id']
-        result = node.find_successor(node_id)
+        result = node.find_responsible_node(node_id)
         if not result:
             return jsonify({'error': 'No se pudo encontrar el sucesor'}), 500
         return jsonify(result)
@@ -281,7 +350,6 @@ def main() -> None:
 
     #iniciamos los servidores y procesos de estabilización
     threading.Thread(target=serve_rest).start()
-    threading.Thread(target=serve_grpc, args=(node,)).start()
     threading.Thread(target=node.stabilize).start()
     threading.Thread(target=node.check_predecessor).start()
 
@@ -289,8 +357,8 @@ def main() -> None:
     while True:
         command = input("> ").strip()
         if command.startswith("store"):
-            _, filename = command.split()
-            print(node.store_file(filename))
+            _, filename, content = command.split(maxsplit=2)
+            print(node.store_file_grpc(filename, content))
         elif command.startswith("lookup"):
             _, filename = command.split()
             print(node.lookup_file(filename))
@@ -301,6 +369,10 @@ def main() -> None:
                 print(response['error'])
             else:
                 print(f"Archivo '{filename}' está en {response['url']}")
+        elif command.startswith("download"):
+            _, filename = command.split()
+            content = node.download_file_grpc(filename)
+            print(f"Contenido descargado: {content}")
         elif command == "info":
             node.display_info()
         else:
