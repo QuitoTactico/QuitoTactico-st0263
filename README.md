@@ -178,6 +178,7 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
   ```bash
   > info
   ```
+  ![image](https://github.com/user-attachments/assets/b88f6e6d-20b1-4719-ab48-5cbf6eabb8f6)
 
 - **Para ver la ayuda (lista de comandos):**
   ```bash
@@ -195,7 +196,14 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
 
 - **Resiliencia y escalabilidad:** El sistema está diseñado para ser escalable y permitir la adición de nodos sin interrupciones. Y no sólo se puede agregar nodos, sino que también se pueden eliminar nodos sin afectar la red, ya sea a propósito o por errores en esos nodos. La red se estabiliza automáticamente en forma de anillo para mantener la consistencia y la disponibilidad de los archivos.
 
-- **Pruebas en ambiente real:** Se probó la solución en un entorno distribuido (usando múltiples instancias EC2 en AWS) para simular adecuadamente el comportamiento de la red P2P. Las pasó con éxito, demostrando la capacidad de la solución para manejar la distribución y búsqueda de archivos en un entorno real.
+- **Pruebas en ambiente real:** Se probó la solución en un entorno distribuido (usando múltiples instancias EC2 en AWS) para simular adecuadamente el comportamiento de la red P2P. Las pasó con éxito, demostrando la capacidad de la solución para manejar la distribución y búsqueda de archivos en un entorno real mientras continuamente autogestionaba su topología de red.
+
+![image](https://github.com/user-attachments/assets/46977785-b7c1-4c52-a446-1283805d1802)
+
+![image](https://github.com/user-attachments/assets/3b06829c-1d59-4504-89a2-a63e61070763)
+
+- **Intentos pasados:** La primera vez intentamos hacerlo todo con gRPC, pero no funcionó muy bien, porque la cantidad de parámetros era complicada de empaquetar y desempaquetar, y el manejo de errores terminaba siendo mucho más grande que la lógica del código en sí, así que optamos por la herramienta más especializada para ello: API REST (mediante Flask). Al segundo intento intentamos aplicar finger table, y se distribuía correctamente (En la imagen de ejemplo habían 3 nodos en el anillo), pero el usarla nos dañaba otra parte del código. Descubrimos los errores, pero luego no tuvimos tiempo de implementarla de nuevo. Podríamos hacerlo con el tiempo suficiente, lo pensaremos a futuro por pura diversión.
+  ![image](https://github.com/user-attachments/assets/3b43ce4f-01af-4060-bc0f-c06eecd6beb9)
 
 ---
 
