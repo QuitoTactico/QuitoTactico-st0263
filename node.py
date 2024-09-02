@@ -288,7 +288,7 @@ def find_successor_route():
             return jsonify({'error': 'missing id'}), 400
         
         node_id = data['id']
-        result = node.find_responsible_node(node_id)
+        result = node.find_successor(node_id)
         if not result:
             return jsonify({'error': 'no se pudo encontrar el sucesor'}), 500
         return jsonify(result)
