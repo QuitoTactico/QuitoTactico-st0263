@@ -202,7 +202,7 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
 
 ![image](https://github.com/user-attachments/assets/3b06829c-1d59-4504-89a2-a63e61070763)
 
-- **Intentos pasados:** La primera vez intentamos hacerlo todo con gRPC, pero no funcionó muy bien, porque la cantidad de parámetros era complicada de empaquetar y desempaquetar, y el manejo de errores terminaba siendo mucho más grande que la lógica del código en sí, así que optamos por la herramienta más especializada para ello: API REST (mediante Flask). Al segundo intento intentamos aplicar finger table, y se distribuía correctamente (En la imagen de ejemplo habían 3 nodos en el anillo), pero el usarla nos dañaba otra parte del código. Descubrimos los errores, pero luego no tuvimos tiempo de implementarla de nuevo. Podríamos hacerlo con el tiempo suficiente, lo pensaremos a futuro por pura diversión.
+- **Intentos pasados:** La primera vez intentamos hacerlo todo con gRPC, pero no funcionó muy bien, porque la cantidad de parámetros era complicada de empaquetar y desempaquetar, y el manejo de errores terminaba siendo mucho más grande que la lógica del código en sí, así que optamos por la herramienta más especializada para ello: API REST (mediante Flask). Al segundo intento intentamos aplicar finger table, y se distribuía correctamente (En la imagen de ejemplo habían 3 nodos en el anillo), pero el usarla nos dañaba otra parte del código. Descubrimos los errores, pero luego no tuvimos tiempo de implementarla de nuevo. Podríamos hacerlo con el tiempo suficiente, lo pensaremos a futuro por pura diversión.  
   ![image](https://github.com/user-attachments/assets/3b43ce4f-01af-4060-bc0f-c06eecd6beb9)
 
 ---
@@ -221,4 +221,6 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
 
 ## Video:
 
-Aquí pondremos el link :)
+https://youtu.be/p6XeX6EPd2Y  
+![video](https://youtu.be/p6XeX6EPd2Y)
+
