@@ -224,3 +224,6 @@ Este proyecto implementa un sistema P2P utilizando la arquitectura basada en Cho
 https://youtu.be/p6XeX6EPd2Y  
 ![video](https://youtu.be/p6XeX6EPd2Y)
 
+Ese video de arriba se quedó procesando en youtube, así que lo montamos otra vez. Usar este link provisional si el de arriba aún no ha terminado de procesar para cuando revises esto.
+https://youtu.be/cDzMTLfBeKY
+
